@@ -133,11 +133,14 @@ export function createHeritageLayer({ source, services } = {}) {
     const next = new Map(records.map((record) => [record.id, record]));
     const entities = state.dataSource.entities;
     entities.suspendEvents();
-    for (const id of state.recordById.keys())
-      if (!next.has(id)) entities.removeById(id);
-    for (const record of records)
-      if (!state.recordById.has(record.id)) addEntity(record);
-    entities.resumeEvents();
+    try {
+      for (const id of state.recordById.keys())
+        if (!next.has(id)) entities.removeById(id);
+      for (const record of next.values())
+        if (!state.recordById.has(record.id)) addEntity(record);
+    } finally {
+      entities.resumeEvents();
+    }
     state.recordById = next;
     removeEntityContextsForLayer(LAYER_ID, { retainIds: new Set(next.keys()) });
     governorRequestRender('heritage-render');

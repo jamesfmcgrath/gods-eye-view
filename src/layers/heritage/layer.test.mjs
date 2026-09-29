@@ -103,3 +103,16 @@ test('disable clears entities and ignores a late response', async () => {
   assert.equal(viewer.dataSource.entities.values.length, 0);
   assert.equal(layer.getStats().status, 'idle');
 });
+
+test('a duplicate id in one response renders once and events stay resumed', async () => {
+  const viewer = fakeViewer({ south: 53.85, west: -9.65, north: 53.92, east: -9.5 });
+  const other = { ...rath, id: 'smr:MA2', smrs: 'MA2' };
+  const responses = [[rath, rath], [other]];
+  const layer = createHeritageLayer({ source: { fetch: async () => ({ records: responses.shift(), total: 1, saturated: false }) }, services: fakeServices() });
+  layer.init(viewer);
+  layer.enable(viewer);
+  await layer.update(viewer);
+  assert.equal(viewer.dataSource.entities.values.length, 1);
+  await layer.update(viewer);
+  assert.deepEqual(viewer.dataSource.entities.values.map((e) => e.id), ['smr:MA2']);
+});
