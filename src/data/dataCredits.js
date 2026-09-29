@@ -160,6 +160,13 @@ export const DATA_CREDITS = [
       ' · Incident information: ' +
       '<a href="https://inciweb.wildfire.gov/" target="_blank" rel="noopener">InciWeb</a>',
   },
+  {
+    key: 'nms-smr',
+    html:
+      'Monuments: ' +
+      '<a href="https://www.archaeology.ie/collections-and-publications/open-data/" target="_blank" rel="noopener">National Monuments Service, Government of Ireland</a>' +
+      ' (CC BY 4.0)',
+  },
   OSM_CREDIT,
   OPENMAPTILES_CREDIT,
   {

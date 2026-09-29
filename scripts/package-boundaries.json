@@ -1309,6 +1309,10 @@
       "./standalone/catalog"
     ],
     "modules": [
+      "src/layers/heritage/index.js",
+      "src/data/heritageClasses.js",
+      "src/layers/heritage/source.js",
+      "src/layers/heritage/policy.js",
       "src/cyberSonarScene.js",
       "src/cyberSonar.js",
       "src/hudLayouts.js",
@@ -1338,6 +1342,7 @@
       "src/app/layerPresentation.js",
       "src/app/layers/aisLiveVessels.js",
       "src/app/layers/alprCameras.js",
+      "src/app/layers/heritage.js",
       "src/app/layers/bikeshare.js",
       "src/app/layers/cctv.js",
       "src/app/layers/earthquakes.js",
@@ -2048,6 +2053,10 @@
   "application-layer-construction": {
     "exports": ["./application/layers"],
     "modules": [
+      "src/app/layers/heritage.js",
+      "src/layers/heritage/index.js",
+      "src/layers/heritage/policy.js",
+      "src/data/heritageClasses.js",
       "src/cyberSonar.js",
       "src/data/bhoteKoshiEvent.js",
       "src/ui/imagerySplit.js",

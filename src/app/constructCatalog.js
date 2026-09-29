@@ -19,6 +19,7 @@ import { createApplicationInstallations } from './layers/militaryInstallations.j
 import { createApplicationSatellites } from './layers/satellites.js';
 import { createApplicationLaunches } from './layers/rocketLaunches.js';
 import { createApplicationAlpr } from './layers/alprCameras.js';
+import { createApplicationHeritage } from './layers/heritage.js';
 import { createApplicationLocalAdsb } from './layers/localAdsb.js';
 import { createApplicationAwareness } from './layers/militaryAwareness.js';
 import { createApplicationFirms } from './layers/firms.js';
@@ -48,6 +49,7 @@ const SOURCE_METHODS = Object.freeze({
   satellites: ['readGroup'],
   launches: ['getLaunches', 'getActiveTle'],
   alpr: ['fetch'],
+  heritage: ['fetch'],
   firms: ['getSnapshot'],
   wind: ['getSnapshot'],
   weather: ['getSnapshot'],
@@ -148,6 +150,7 @@ export function createApplicationCatalog({
           source: sources['fire-perimeters'],
         }),
         createApplicationAlpr({ surface, source: sources.alpr }),
+        createApplicationHeritage({ source: sources.heritage }),
         satellites,
         createApplicationLaunches({ source: sources.launches, satellites }),
         createApplicationTraffic({ source: sources.traffic, surface }),

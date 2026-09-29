@@ -45,6 +45,10 @@ const PANEL_GROUPS = [
     ],
   },
   {
+    label: 'Heritage',
+    ids: ['heritage-smr'],
+  },
+  {
     label: 'Events',
     ids: ['rocket-launches', 'earthquakes', 'local-firms', 'fire-perimeters'],
   },
@@ -74,6 +78,7 @@ const PANEL_LABELS = {
   bikeshare: 'Bike Share',
   cctv: 'Cameras',
   'alpr-cameras': 'Mapped ALPR Cameras',
+  'heritage-smr': 'Monuments (SMR)',
   'local-datacenters': 'Data Centers',
   'local-firms': 'Active Fires',
 };
