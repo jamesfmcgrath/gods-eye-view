@@ -282,6 +282,7 @@
       "src/data/installationFeedback.js",
       "src/voice/voiceCost.js",
       "src/voice/actionSchemas.js",
+      "src/data/heritageClasses.js",
       "server/providers/openai/toolDescriptions.js",
       "src/sources/rateLimit.js"
     ],
@@ -1856,6 +1857,7 @@
       "src/voice/commands.js",
       "src/voice/control.js",
       "src/voice/gevActions.js",
+      "src/voice/heritageQuery.js",
       "src/voice/gevRealtime.js",
       "src/voice/layerSummary.js",
       "src/voice/realtimeBackend.js",
@@ -2745,7 +2747,11 @@
   },
   "voice-action-schemas": {
     "exports": ["./voice/action-schemas"],
-    "modules": ["src/voice/actionSchemas.js", "src/hudLayoutPolicy.js"],
+    "modules": [
+      "src/voice/actionSchemas.js",
+      "src/hudLayoutPolicy.js",
+      "src/data/heritageClasses.js"
+    ],
     "external": []
   },
   "voice-session": {
