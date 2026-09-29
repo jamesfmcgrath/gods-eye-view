@@ -143,6 +143,9 @@ const PHRASES = [
   { phrase: 'Pause the radio', expect: 'control_radio', args: { action: 'pause' } },
   { phrase: 'Stop the radio', expect: 'control_radio', args: { action: 'stop' } },
   { phrase: 'When does the ISS pass over next?', expect: 'next_iss_pass' },
+  { phrase: 'How many ringforts are in view?', expect: 'heritage_query' },
+  { phrase: 'Take me to the nearest tower house.', expect: 'heritage_query' },
+  { phrase: 'How many holy wells are within ten kilometres?', expect: 'heritage_query' },
 
   // — annotations —
   { phrase: 'Annotate the Texas State Capitol and its grounds', expect: 'annotate_map' },

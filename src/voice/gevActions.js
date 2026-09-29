@@ -39,6 +39,7 @@ import { unavailablePlaceSearch } from '../search/placeSearch.js';
 import * as defaultAnnotationResolver from '../annotations/annotationResolver.js';
 import { normalizeRadioCountryInput } from '../data/radioCountry.js';
 import { TR3B_CLASS } from '../data/tr3bRegistry.js';
+import { runHeritageQuery, heritageViewContext } from './heritageQuery.js';
 
 const ALLOWED_STYLES = new Set([
   'normal',
@@ -235,6 +236,10 @@ const LAYER_ALIASES = new Map([
   ['my receiver', 'local-adsb'],
   ['my antenna', 'local-adsb'],
   ['my sdr', 'local-adsb'],
+  ['monuments', 'heritage-smr'],
+  ['national monuments', 'heritage-smr'],
+  ['heritage', 'heritage-smr'],
+  ['smr', 'heritage-smr'],
 ]);
 
 const CITY_ALIASES = new Map([
@@ -986,6 +991,12 @@ export function createGevActionRunner({
       return nextIssPass(viewer, dataManager, args);
     }
 
+    if (name === 'heritage_query') {
+      return runHeritageQuery(args, {
+        getView: () => heritageViewContext(viewer),
+        signal: runOptions.signal,
+      });
+    }
     if (name === 'analyst_query') {
       analystEngine ||= createAnalystEngine(
         analystProviders(viewer, dataManager, {

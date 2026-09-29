@@ -25,11 +25,11 @@ const css = readStylesheet(new URL('../style.css', import.meta.url));
 
 function realtimeTools() { return GEV_REALTIME_TOOLS; }
 
-test('Realtime schema exposes the authoritative 30-tool inventory', () => {
+test('Realtime schema exposes the authoritative 31-tool inventory', () => {
   const tools = realtimeTools();
-  assert.equal(tools.length, 30);
+  assert.equal(tools.length, 31);
   const names = tools.map((tool) => tool.name);
-  assert.equal(new Set(names).size, 30, 'tool names are unique');
+  assert.equal(new Set(names).size, 31, 'tool names are unique');
   assert.ok(names.includes('set_context_mode'));
   assert.ok(names.includes('control_cockpit'));
   assert.ok(names.includes('select_nearest_aircraft'));
@@ -184,6 +184,7 @@ test('no unchanged Realtime tool definition drifts silently', () => {
     'analyst_query',
     'next_iss_pass',
     'next_satellite_pass',
+    'heritage_query',
     // Local ADS-B adds one layer enum value and its common-name mapping.
     'set_layer_visibility',
   ]);
@@ -192,6 +193,9 @@ test('no unchanged Realtime tool definition drifts silently', () => {
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((tool) => structuredClone(tool))
     .filter((tool) => tool.name !== 'set_cyber_sonar');
+  // The Monuments layer adds one `heritage-smr` enum value to the layers menu tool.
+  const menuLayer = unchanged.find((tool) => tool.name === 'show_data_layers_menu').parameters.properties.layerId;
+  menuLayer.enum = menuLayer.enum.filter((key) => key !== 'heritage-smr');
   // Cyber adds one HUD choice and the sonar tool; retain the existing pin for every legacy field.
   const hudLayout = unchanged.find((tool) => tool.name === 'set_hud').parameters.properties.layout;
   assert.deepEqual(hudLayout.enum, ['tactical', 'operator', 'minimal', 'cyber']);

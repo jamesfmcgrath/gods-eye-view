@@ -599,4 +599,33 @@ export const ACTION_DESCRIPTIONS = {
       'Predict the next pass in 24 hours for one satellite in the loaded catalog, identified by exact NORAD ID or name. Ambiguous names return candidates: ask for a choice rather than selecting one. Defaults to geometric passes; visibleOnly requires estimated illumination and a dark observer sky, which does not guarantee naked-eye visibility. Uses camera location unless coordinates are supplied.',
     $position: 1,
   },
+  heritage_query: {
+    description:
+      'Answer questions about recorded archaeological monuments in Ireland from the National Monuments Service Sites and Monuments Record (Republic of Ireland only): "how many ringforts are in view", "where is the nearest tower house", "how many holy wells within 10 km". mode "count" returns a total and the most common classes; mode "nearest" returns the closest monuments with latitude and longitude. Map spoken words to types: forts, raths and cashels to ringfort, rath or cashel; abbeys, friaries, priories and monasteries to religious-house; dolmens to portal-tomb; wells to holy-well; castles to castle, and tower houses to tower-house. Omit types for all monuments. Works whether or not the Monuments layer is on.',
+    $position: 1,
+    parameters: {
+      properties: {
+        mode: {
+          description:
+            '"count" for how many; "nearest" for where is the closest or take me to.',
+          $position: 2,
+        },
+        types: {
+          description:
+            'Monument types to include. Omit for every recorded monument.',
+          $position: 2,
+        },
+        scope: {
+          description:
+            'count only. Omit for the current view; use kind "radius" with km for "within N km".',
+          $position: 3,
+        },
+        limit: {
+          description:
+            'nearest only. How many to return, 1 to 10. Use 1 for "take me to".',
+          $position: 1,
+        },
+      },
+    },
+  },
 };

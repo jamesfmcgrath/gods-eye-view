@@ -1,3 +1,4 @@
+import { HERITAGE_TYPE_KEYS } from '../data/heritageClasses.js';
 import { HUD_LAYOUTS } from '../hudLayoutPolicy.js';
 
 // Canonical action arguments. Descriptive wording is supplied separately.
@@ -137,6 +138,7 @@ const schemas = [
             'ais-live-vessels',
             'local-datacenters',
             'local-dams',
+            'heritage-smr',
             'telegeography-submarine-cables',
             'local-firms',
             'fire-perimeters',
@@ -171,6 +173,7 @@ const schemas = [
             'ais-live-vessels',
             'local-datacenters',
             'local-dams',
+            'heritage-smr',
             'telegeography-submarine-cables',
             'local-firms',
             'fire-perimeters',
@@ -897,6 +900,30 @@ const schemas = [
         minElevationDeg: { type: 'number', minimum: 5, maximum: 60 },
         visibleOnly: { type: 'boolean' },
       },
+    },
+  },
+  {
+    name: 'heritage_query',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        mode: { type: 'string', enum: ['count', 'nearest'] },
+        types: {
+          type: 'array',
+          items: { type: 'string', enum: [...HERITAGE_TYPE_KEYS] },
+        },
+        scope: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            kind: { type: 'string', enum: ['view', 'radius'] },
+            km: { type: 'number' },
+          },
+        },
+        limit: { type: 'number' },
+      },
+      required: ['mode'],
     },
   },
 ];
