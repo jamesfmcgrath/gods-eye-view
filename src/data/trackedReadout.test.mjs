@@ -230,6 +230,18 @@ test('selection lifecycle leaves installations to their own entry and retains AL
     assert.equal(getActiveTrackedReadoutId(), 'alpr:42');
     assert.equal(recorder.calls.filter(({ op }) => op === 'set').at(-1).entries[0].title, 'FLOCK SAFETY ALPR');
 
+    // Heritage monuments are static context: a click publishes the card.
+    const monument = {
+      gevTrackedId: 'smr:MA1',
+      gevDisplayPosition: () => ({ x: 7, y: 8, z: 9 }),
+      gevLabelModel: { title: 'RINGFORT - RATH', details: ['SMR MA1'], accent: '#e69f00' },
+    };
+    fakeWindow.dispatchEvent(new CustomEvent('gev:entity-selected', {
+      detail: { layerId: 'heritage-smr', entity: monument },
+    }));
+    assert.equal(getActiveTrackedReadoutId(), 'smr:MA1');
+    assert.equal(recorder.calls.filter(({ op }) => op === 'set').at(-1).entries[0].title, 'RINGFORT - RATH');
+
     fakeWindow.dispatchEvent(new CustomEvent('gev:entity-selected', {
       detail: { layerId: 'ais-live-vessels', entity: installation },
     }));

@@ -5,9 +5,15 @@ import * as picking from '../../data/pickRegistry.js';
 import { createHeritageLayer } from '../../layers/heritage/index.js';
 
 /** Construct the Monuments (SMR) layer with the application scene owners. */
-export function createApplicationHeritage({ source }) {
+export function createApplicationHeritage({ surface, source }) {
   return createHeritageLayer({
     source,
-    services: { credits, render, context, picking },
+    services: {
+      credits,
+      render,
+      context,
+      picking,
+      groundFloor: surface?.groundFloor,
+    },
   });
 }

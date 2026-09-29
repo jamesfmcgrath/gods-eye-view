@@ -2,47 +2,89 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import * as Cesium from 'cesium';
 import { createHeritageLayer, viewBox } from './index.js';
+import { HERITAGE_FAMILY_COLORS } from '../../data/heritageClasses.js';
+import { createTrackedOverlayEntry } from '../../data/trackedReadout.js';
+import { claimPointer, resetPointerOwnership } from '../../data/inputOwnership.js';
 
 // ScreenSpaceEventHandler registers DOM listeners on construction; Node has no DOM.
+// Its LEFT_CLICK action is captured so tests can click without a canvas.
 const originals = {};
+let clickAction = null;
+const originalSetInputAction = Cesium.ScreenSpaceEventHandler.prototype.setInputAction;
 before(() => {
   for (const name of ['document', 'window']) originals[name] = globalThis[name];
   globalThis.document = { addEventListener() {}, removeEventListener() {} };
   globalThis.window = new EventTarget();
+  Cesium.ScreenSpaceEventHandler.prototype.setInputAction = function (action, type) {
+    if (type === Cesium.ScreenSpaceEventType.LEFT_CLICK) clickAction = action;
+    return originalSetInputAction.call(this, action, type);
+  };
 });
 after(() => {
   for (const name of ['document', 'window']) {
     if (originals[name] === undefined) delete globalThis[name];
     else globalThis[name] = originals[name];
   }
+  Cesium.ScreenSpaceEventHandler.prototype.setInputAction = originalSetInputAction;
 });
 
-function fakeViewer(box) {
+function fakeViewer(box, { groundHeight } = {}) {
   let dataSource;
-  return {
+  const viewer = {
+    picked: undefined,
     camera: {
       moveEnd: new Cesium.Event(),
       computeViewRectangle: () => (box ? Cesium.Rectangle.fromDegrees(box.west, box.south, box.east, box.north) : undefined),
     },
-    scene: { canvas: { addEventListener() {}, removeEventListener() {} }, globe: { ellipsoid: Cesium.Ellipsoid.WGS84 }, pick: () => undefined },
+    scene: {
+      canvas: { addEventListener() {}, removeEventListener() {} },
+      globe: { ellipsoid: Cesium.Ellipsoid.WGS84, show: true, getHeight: () => groundHeight },
+      pick: () => viewer.picked,
+    },
     dataSources: { add: (v) => { dataSource = v; }, remove() {} },
     get dataSource() { return dataSource; },
   };
+  return viewer;
 }
 
-function fakeServices() {
+function fakeServices({ siblingIds = [] } = {}) {
   const registered = [];
+  const selected = [];
+  const cleared = [];
   return {
     registered,
+    selected,
+    cleared,
     render: { governorRequestRender() {} },
-    picking: { registerPickOwner() {}, unregisterPickOwner() {} },
+    picking: {
+      registerPickOwner() {},
+      unregisterPickOwner() {},
+      resolvePickId: (picked) => picked?.id?.id ?? null,
+      isOwnedByOtherLayer: (layerId, id) => siblingIds.includes(id),
+    },
     context: {
       registerEntityContext: (entity, meta) => registered.push(meta),
-      selectEntityContext() {},
-      clearSelectedEntityContextForLayer() {},
+      selectEntityContext: (entity) => selected.push(entity.id),
+      clearSelectedEntityContextForLayer: (layerId) => cleared.push(layerId),
       removeEntityContextsForLayer() {},
     },
   };
+}
+
+const inView = { south: 53.85, west: -9.65, north: 53.92, east: -9.5 };
+
+async function loadedLayer(records, { services = fakeServices(), groundHeight } = {}) {
+  const viewer = fakeViewer(inView, { groundHeight });
+  const layer = createHeritageLayer({ source: { fetch: async () => ({ records, total: records.length, saturated: false }) }, services });
+  layer.init(viewer);
+  layer.enable(viewer);
+  await layer.update(viewer);
+  return { viewer, layer, services };
+}
+
+function click(viewer, entityId) {
+  viewer.picked = entityId ? { id: { id: entityId } } : undefined;
+  clickAction({ position: new Cesium.Cartesian2(10, 10) });
 }
 
 const rath = { id: 'smr:MA1', smrs: 'MA1', monumentClass: 'Ringfort - rath', townland: 'Ardkeen', county: 'Mayo', latitude: 53.88, longitude: -9.55, link: null };
@@ -115,4 +157,56 @@ test('a duplicate id in one response renders once and events stay resumed', asyn
   assert.equal(viewer.dataSource.entities.values.length, 1);
   await layer.update(viewer);
   assert.deepEqual(viewer.dataSource.entities.values.map((e) => e.id), ['smr:MA2']);
+});
+
+test('a selected monument publishes a readout anchored at ground height', async () => {
+  const { viewer, services } = await loadedLayer([rath], { groundHeight: 312 });
+  click(viewer, 'smr:MA1');
+  assert.deepEqual(services.selected, ['smr:MA1']);
+  const entry = createTrackedOverlayEntry(viewer.dataSource.entities.getById('smr:MA1'));
+  assert.ok(entry, 'heritage entity yields a readout entry');
+  assert.equal(entry.id, 'smr:MA1');
+  assert.equal(entry.title, 'RINGFORT - RATH');
+  const anchor = Cesium.Cartographic.fromCartesian(entry.position());
+  assert.ok(Math.abs(anchor.height - 312) < 0.01, `anchor height ${anchor.height}`);
+});
+
+test('a monument click is ignored while a tool owns the pointer', async () => {
+  const { viewer, services } = await loadedLayer([rath]);
+  const lease = claimPointer('draw');
+  try {
+    click(viewer, 'smr:MA1');
+    click(viewer, null);
+  } finally {
+    resetPointerOwnership();
+  }
+  assert.ok(lease);
+  assert.deepEqual(services.selected, []);
+  assert.deepEqual(services.cleared, []);
+});
+
+test('an empty click clears the selection; a sibling-owned pick does not', async () => {
+  const services = fakeServices({ siblingIds: ['flight:abc'] });
+  const { viewer } = await loadedLayer([rath], { services });
+  click(viewer, 'smr:MA1');
+  click(viewer, 'flight:abc');
+  assert.deepEqual(services.cleared, [], 'sibling pick leaves the selection alone');
+  click(viewer, null);
+  assert.deepEqual(services.cleared, ['heritage-smr']);
+});
+
+test('the row legend names each colour family with its shown count', async () => {
+  const castle = { ...rath, id: 'smr:MA3', smrs: 'MA3', monumentClass: 'Castle - tower house' };
+  const well = { ...rath, id: 'smr:MA4', smrs: 'MA4', monumentClass: 'Ritual site - holy well' };
+  const { layer } = await loadedLayer([rath, castle, well]);
+  assert.deepEqual(
+    layer.getRowControls().legend.map(({ label, color, count }) => ({ label, color, count })),
+    [
+      { label: 'Ringforts and forts', color: HERITAGE_FAMILY_COLORS.ringfort, count: 1 },
+      { label: 'Castles', color: HERITAGE_FAMILY_COLORS.castle, count: 1 },
+      { label: 'Church sites', color: HERITAGE_FAMILY_COLORS.ecclesiastical, count: 1 },
+      { label: 'Tombs and stones', color: HERITAGE_FAMILY_COLORS.ritual, count: 0 },
+      { label: 'Other', color: HERITAGE_FAMILY_COLORS.other, count: 0 },
+    ],
+  );
 });

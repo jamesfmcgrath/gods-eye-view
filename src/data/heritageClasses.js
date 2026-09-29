@@ -127,15 +127,28 @@ const FAMILY_RULES = [
   ],
 ];
 
+/** Okabe-Ito based, chosen to stay distinct under deuteranopia and protanopia. */
 export const HERITAGE_FAMILY_COLORS = Object.freeze({
-  ringfort: '#d9a441',
-  castle: '#e2574c',
-  ecclesiastical: '#6fa8ff',
-  ritual: '#b388ff',
-  other: '#9ca6b0',
+  ringfort: '#e69f00',
+  castle: '#cc79a7',
+  ecclesiastical: '#56b4e9',
+  ritual: '#009e73',
+  other: '#bbbbbb',
 });
 
-/** Colour family for a class; colour is never the only cue (labels carry the class). */
+/** Legend wording per family, in legend order. */
+export const HERITAGE_FAMILY_LABELS = Object.freeze({
+  ringfort: 'Ringforts and forts',
+  castle: 'Castles',
+  ecclesiastical: 'Church sites',
+  ritual: 'Tombs and stones',
+  other: 'Other',
+});
+
+/**
+ * Colour family for a class. Colour is not the only cue: the layer legend names
+ * each family and the selection readout names the class.
+ */
 export function heritageFamily(monumentClass) {
   if (typeof monumentClass !== 'string') return 'other';
   for (const [family, rule] of FAMILY_RULES)

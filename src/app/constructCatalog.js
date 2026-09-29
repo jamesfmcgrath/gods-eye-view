@@ -150,7 +150,7 @@ export function createApplicationCatalog({
           source: sources['fire-perimeters'],
         }),
         createApplicationAlpr({ surface, source: sources.alpr }),
-        createApplicationHeritage({ source: sources.heritage }),
+        createApplicationHeritage({ surface, source: sources.heritage }),
         satellites,
         createApplicationLaunches({ source: sources.launches, satellites }),
         createApplicationTraffic({ source: sources.traffic, surface }),

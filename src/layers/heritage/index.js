@@ -1,6 +1,8 @@
 import * as Cesium from 'cesium';
+import { isPointerFree } from '../../data/inputOwnership.js';
 import {
   HERITAGE_FAMILY_COLORS,
+  HERITAGE_FAMILY_LABELS,
   heritageFamily,
 } from '../../data/heritageClasses.js';
 import {
@@ -12,6 +14,12 @@ import {
 } from './policy.js';
 
 const toDeg = Cesium.Math.toDegrees;
+const ANCHOR_RESAMPLE_MS = 1000;
+
+/** Plausible terrain height in metres; rejects NaN and tile-streaming garbage. */
+function validGroundHeight(height) {
+  return Number.isFinite(height) && height >= -500 && height <= 10000;
+}
 
 /** Current view as a degree box, or null for the sky or a view too wide to sample. */
 export function viewBox(viewer) {
@@ -46,7 +54,13 @@ export function createHeritageLayer({ source, services } = {}) {
   if (typeof source?.fetch !== 'function')
     throw new TypeError('Heritage requires a monument source');
   const { governorRequestRender } = services.render;
-  const { registerPickOwner, unregisterPickOwner } = services.picking;
+  const {
+    registerPickOwner,
+    unregisterPickOwner,
+    resolvePickId,
+    isOwnedByOtherLayer,
+  } = services.picking;
+  const cachedGroundFloor = services.groundFloor?.cachedGroundFloor;
   const {
     registerEntityContext,
     selectEntityContext,
@@ -63,6 +77,7 @@ export function createHeritageLayer({ source, services } = {}) {
     timer: null,
     removeMoveEnd: null,
     clickHandler: null,
+    selectedId: null,
     status: 'idle',
     error: null,
     lastUpdate: null,
@@ -103,6 +118,11 @@ export function createHeritageLayer({ source, services } = {}) {
       },
     });
     entity.gevTrackedId = record.id;
+    // The point is ground-clamped; the readout anchors at sampled ground height,
+    // never at height 0, which would sit underground on high terrain.
+    entity.gevHeritageDisplayPosition = null;
+    entity.gevHeritageAnchorSampledAt = 0;
+    entity.gevDisplayPosition = () => displayPosition(entity, record);
     entity.gevLabelModel = {
       title: record.monumentClass.toUpperCase(),
       details: heritageDetails(record),
@@ -128,6 +148,47 @@ export function createHeritageLayer({ source, services } = {}) {
     });
   }
 
+  /** Ground height under a record: rendered surface, then globe, then cached floor. */
+  function groundHeight(entity, record) {
+    const scene = state.viewer?.scene;
+    if (!scene) return undefined;
+    const location = Cesium.Cartographic.fromDegrees(
+      record.longitude,
+      record.latitude,
+    );
+    let height;
+    if (scene.sampleHeightSupported) {
+      try {
+        height = scene.sampleHeight(location, [entity]);
+      } catch {
+        /* tiles may still be streaming */
+      }
+    }
+    if (!validGroundHeight(height) && scene.globe?.show)
+      height = scene.globe.getHeight?.(location);
+    if (!validGroundHeight(height))
+      height = cachedGroundFloor?.(record.latitude, record.longitude);
+    return validGroundHeight(height) ? height : undefined;
+  }
+
+  /** Cached readout anchor; resampled at most once a second until it resolves. */
+  function displayPosition(entity, record) {
+    if (entity.gevHeritageDisplayPosition)
+      return entity.gevHeritageDisplayPosition;
+    const now = Date.now();
+    if (now - entity.gevHeritageAnchorSampledAt < ANCHOR_RESAMPLE_MS)
+      return null;
+    entity.gevHeritageAnchorSampledAt = now;
+    const height = groundHeight(entity, record);
+    if (height === undefined) return null;
+    entity.gevHeritageDisplayPosition = Cesium.Cartesian3.fromDegrees(
+      record.longitude,
+      record.latitude,
+      height,
+    );
+    return entity.gevHeritageDisplayPosition;
+  }
+
   function render(records) {
     if (!state.dataSource) return;
     const next = new Map(records.map((record) => [record.id, record]));
@@ -142,6 +203,8 @@ export function createHeritageLayer({ source, services } = {}) {
       entities.resumeEvents();
     }
     state.recordById = next;
+    if (state.selectedId && !next.has(state.selectedId))
+      state.selectedId = null;
     removeEntityContextsForLayer(LAYER_ID, { retainIds: new Set(next.keys()) });
     governorRequestRender('heritage-render');
   }
@@ -186,13 +249,28 @@ export function createHeritageLayer({ source, services } = {}) {
     }
   }
 
+  function clearSelection() {
+    state.selectedId = null;
+    clearSelectedEntityContextForLayer(LAYER_ID);
+    governorRequestRender('heritage-selection');
+  }
+
   function onClick({ position }) {
+    // A tool owns the pointer (src/data/inputOwnership.js): yield the click.
+    if (!isPointerFree()) return;
     if (!state.enabled) return;
     const picked = state.viewer.scene.pick(position);
     const id = picked?.id?.id;
-    if (!state.recordById.has(id)) return;
-    selectEntityContext(state.dataSource.entities.getById(id));
-    governorRequestRender('heritage-selection');
+    if (typeof id === 'string' && state.recordById.has(id)) {
+      state.selectedId = id;
+      selectEntityContext(state.dataSource.entities.getById(id));
+      governorRequestRender('heritage-selection');
+      return;
+    }
+    // A pick owned by a sibling layer is not empty space; that layer handles it.
+    const pickId = picked ? resolvePickId(picked) : null;
+    if (pickId && isOwnedByOtherLayer(LAYER_ID, pickId)) return;
+    if (state.selectedId) clearSelection();
   }
 
   return {
@@ -229,6 +307,7 @@ export function createHeritageLayer({ source, services } = {}) {
       state.abort = null;
       state.loading = false;
       unregisterPickOwner(LAYER_ID);
+      state.selectedId = null;
       clearSelectedEntityContextForLayer(LAYER_ID);
       render([]);
       if (state.dataSource) state.dataSource.show = false;
@@ -245,6 +324,29 @@ export function createHeritageLayer({ source, services } = {}) {
       if (state.dataSource) viewer?.dataSources.remove(state.dataSource, true);
       state.dataSource = null;
       state.viewer = null;
+    },
+    getRowControls() {
+      const counts = new Map();
+      for (const record of state.recordById.values()) {
+        const family = heritageFamily(record.monumentClass);
+        counts.set(family, (counts.get(family) || 0) + 1);
+      }
+      return {
+        chips: [],
+        legend: Object.entries(HERITAGE_FAMILY_LABELS).map(
+          ([family, label], index) => ({
+            label,
+            color: HERITAGE_FAMILY_COLORS[family],
+            count: counts.get(family) || 0,
+            ...(index === 0
+              ? {
+                  blurb:
+                    'Colour shows monument type. Select a point for its class and townland.',
+                }
+              : {}),
+          }),
+        ),
+      };
     },
     getStats() {
       const shown = state.recordById.size;
