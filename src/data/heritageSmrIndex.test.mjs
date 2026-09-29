@@ -47,6 +47,8 @@ test('points keeps the records nearest the box centre when saturated', () => {
   assert.equal(result.total, 3);
   assert.equal(result.saturated, true);
   assert.equal(result.records.length, 1);
+  // Centre (53.885, -9.575): MA2 is about 0.8 km away, MA1 about 1.7 km, MA4 about 3.6 km.
+  assert.equal(result.records[0].smrs, 'MA2');
 });
 
 test('types filter by vocabulary key', () => {

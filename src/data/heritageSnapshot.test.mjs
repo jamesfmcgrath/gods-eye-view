@@ -7,7 +7,10 @@ import {
   validateSmrSnapshot,
   downloadSmrSnapshot,
   writeSmrSnapshot,
+  loadSmrSnapshotFile,
 } from '../../server/providers/heritage/snapshot.js';
+import os from 'node:os';
+import path from 'node:path';
 
 const LINK = (smrs) =>
   `https://heritagedata.maps.arcgis.com/apps/webappviewer/index.html?id=x&query=layer%2CSMRS%2C${smrs}`;
@@ -129,4 +132,9 @@ test('write goes to a temporary file first, then renames over the target', async
     ['writeFile', '/x/smr/snapshot.json.tmp'],
     ['rename', '/x/smr/snapshot.json.tmp', '/x/smr/snapshot.json'],
   ]);
+});
+
+test('a missing snapshot file is reported as SMR_SNAPSHOT_MISSING', async () => {
+  const missing = path.join(os.tmpdir(), `gev-smr-missing-${process.pid}-${Date.now()}`, 'snapshot.json');
+  await assert.rejects(loadSmrSnapshotFile(missing), { code: 'SMR_SNAPSHOT_MISSING' });
 });

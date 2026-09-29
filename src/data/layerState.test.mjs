@@ -241,13 +241,13 @@ test('production registry is exact, canonical, and rejects incomplete contracts'
   }
   assert.equal(nextLayerStateToken(), '3');
   assert.equal(
-    nextLayerStateToken({ ...LAYER_STATE_TOKEN_RESERVATIONS, alpha: '0', bravo: '3' }),
-    '4',
+    nextLayerStateToken({ ...LAYER_STATE_TOKEN_RESERVATIONS, alpha: '3', bravo: '4' }),
+    '5',
   );
   const digitsExhausted = {
     ...LAYER_STATE_TOKEN_RESERVATIONS,
     ...Object.fromEntries(
-      [...'03456789'].map((digit) => [`prior-${digit}`, digit]),
+      [...'3456789'].map((digit) => [`prior-${digit}`, digit]),
     ),
   };
   assert.equal(nextLayerStateToken(digitsExhausted), '00');
