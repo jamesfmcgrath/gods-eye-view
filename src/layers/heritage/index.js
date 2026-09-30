@@ -110,15 +110,25 @@ function entityContext(record, dataSource) {
   };
 }
 
+// Short screen reader announcements; the long description is never announced.
+const DETAIL_STATUS = {
+  loading: (name) => `Loading description for ${name}`,
+  ready: (name) => `${name}: description loaded`,
+  none: (name) => `${name}: no description published`,
+  error: (name) => `${name}: description unavailable`,
+};
+
 function rowDetail({ record, status, description }) {
+  const heading = `${record.monumentClass}, ${record.townland}`;
   return {
     label: 'Selected monument',
-    heading: `${record.monumentClass}, ${record.townland}`,
+    heading,
     meta: `Co. ${record.county} · SMR ${record.smrs}`,
     text: status === 'ready' ? description : DETAIL_TEXT[status],
+    status: DETAIL_STATUS[status](heading),
     link: {
       href: record.link,
-      label: 'View full record (Historic Environment Viewer)',
+      label: 'View full record in the Historic Environment Viewer',
     },
   };
 }
@@ -329,6 +339,12 @@ export function createHeritageLayer({ source, services } = {}) {
     const request = new AbortController();
     state.detailAbort = request;
     state.detail = { record, status: 'loading', description: null };
+    // No stale excerpt from an earlier load while this one is pending.
+    const selected = state.dataSource?.entities.getById(record.id);
+    if (selected) {
+      selected.gevLabelModel.details = heritageDetails(record);
+      services.overlays?.refreshReadout?.(selected);
+    }
     notifyRow();
     let status;
     let description = null;
@@ -462,7 +478,7 @@ export function createHeritageLayer({ source, services } = {}) {
             ...(index === 0
               ? {
                   blurb:
-                    'Colour shows monument type. Select a point for its class and townland.',
+                    'Colour shows monument type. Select a point for its description and record link.',
                 }
               : {}),
           }),

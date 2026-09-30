@@ -253,7 +253,8 @@ test('selecting a monument loads its description into the row detail and readout
     heading: 'Castle - tower house, Corraun',
     meta: 'Co. Mayo · SMR MA070-110----',
     text: 'Loading description…',
-    link: { href: castle.link, label: 'View full record (Historic Environment Viewer)' },
+    status: 'Loading description for Castle - tower house, Corraun',
+    link: { href: castle.link, label: 'View full record in the Historic Environment Viewer' },
   });
   assert.ok(notified >= 1, 'row listener fired on selection');
   assert.equal(calls.length, 1);
@@ -263,6 +264,7 @@ test('selecting a monument loads its description into the row detail and readout
   calls[0].resolve({ ...castle, description });
   await flush();
   assert.equal(layer.getRowControls().detail.text, description);
+  assert.equal(layer.getRowControls().detail.status, 'Castle - tower house, Corraun: description loaded');
   const entity = viewer.dataSource.entities.getById(castle.id);
   assert.deepEqual(entity.gevLabelModel.details, [
     'CORRAUN, CO. MAYO',
@@ -270,7 +272,8 @@ test('selecting a monument loads its description into the row detail and readout
     'SOURCE: NATIONAL MONUMENTS SERVICE',
     ...excerptLines(description),
   ]);
-  assert.deepEqual(services.refreshed, [entity]);
+  // Refreshed once when loading starts (base lines) and once with the excerpt.
+  assert.deepEqual(services.refreshed, [entity, entity]);
   assert.ok(notified > before, 'row listener fired when the description arrived');
   const context = services.registered.at(-1);
   assert.equal(context.id, castle.id);
@@ -286,6 +289,7 @@ test('a record without a published description says so and adds no excerpt', asy
   calls[0].resolve({ ...castle, description: null });
   await flush();
   assert.equal(layer.getRowControls().detail.text, 'No description has been published for this record yet.');
+  assert.equal(layer.getRowControls().detail.status, 'Castle - tower house, Corraun: no description published');
   assert.equal(viewer.dataSource.entities.getById(castle.id).gevLabelModel.details.length, 3);
   assert.equal(services.registered.at(-1).properties.description, null);
 });
@@ -298,6 +302,7 @@ test('a failed description keeps the record link and invites a retry', async () 
   await flush();
   const { detail } = layer.getRowControls();
   assert.equal(detail.text, 'Description unavailable right now. Try selecting it again shortly.');
+  assert.equal(detail.status, 'Castle - tower house, Corraun: description unavailable');
   assert.equal(detail.link.href, castle.link);
 });
 
@@ -322,4 +327,50 @@ test('an empty click clears the detail and aborts the pending description', asyn
   click(viewer, null);
   assert.equal(layer.getRowControls().detail, undefined);
   assert.equal(calls[0].signal.aborted, true);
+});
+
+test('the legend blurb points to the description and record link', async () => {
+  const { layer } = await loadedLayer([castle]);
+  assert.equal(layer.getRowControls().legend[0].blurb, 'Colour shows monument type. Select a point for its description and record link.');
+});
+
+test('reselecting a monument drops the old excerpt while the description reloads', async () => {
+  const { calls, describe } = deferredDescribe();
+  const services = fakeServices();
+  const { viewer, layer } = await loadedLayer([castle], { services, describe });
+  click(viewer, castle.id);
+  calls[0].resolve({ ...castle, description: 'A tower house in pasture.' });
+  await flush();
+  const entity = viewer.dataSource.entities.getById(castle.id);
+  assert.equal(entity.gevLabelModel.details.length, 4);
+  click(viewer, castle.id);
+  assert.deepEqual(entity.gevLabelModel.details, ['CORRAUN, CO. MAYO', 'SMR MA070-110----', 'SOURCE: NATIONAL MONUMENTS SERVICE']);
+  assert.deepEqual(services.refreshed, [entity, entity, entity]);
+});
+
+test('a selected record leaving the view cancels its detail and pending description', async () => {
+  const { calls, describe } = deferredDescribe();
+  let records = [castle];
+  const viewer = fakeViewer(inView);
+  const layer = createHeritageLayer({ source: { fetch: async () => ({ records, total: records.length, saturated: false }), describe }, services: fakeServices() });
+  layer.init(viewer);
+  layer.enable(viewer);
+  await layer.update(viewer);
+  click(viewer, castle.id);
+  assert.ok(layer.getRowControls().detail);
+  records = [rath];
+  await layer.update(viewer);
+  assert.equal(layer.getRowControls().detail, undefined);
+  assert.equal(calls[0].signal.aborted, true);
+});
+
+test('disable clears the detail', async () => {
+  const { calls, describe } = deferredDescribe();
+  const { viewer, layer } = await loadedLayer([castle], { describe });
+  click(viewer, castle.id);
+  calls[0].resolve({ ...castle, description: 'A tower house.' });
+  await flush();
+  assert.ok(layer.getRowControls().detail);
+  layer.disable(viewer);
+  assert.equal(layer.getRowControls().detail, undefined);
 });

@@ -147,3 +147,20 @@ test('describe maps 404 and 503 to plain errors', async () => {
   assert.equal(busy.ok, false);
   assert.match(busy.error, /busy.*try again/i);
 });
+
+test('describe with a missing snapshot tells the user how to fix it', async () => {
+  const result = await runHeritageQuery(
+    { mode: 'describe', smrs: 'MA070-110----' },
+    { ...describeNoView, fetchImpl: reply({ error: 'smr_snapshot_missing' }, 503) },
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'The monuments data has not been downloaded. Tell the user to run npm run smr:snapshot and restart the app.');
+});
+
+test('describe treats a 503 without JSON as busy', async () => {
+  const result = await runHeritageQuery(
+    { mode: 'describe', smrs: 'MA070-110----' },
+    { ...describeNoView, fetchImpl: async () => new Response('down', { status: 503 }) },
+  );
+  assert.match(result.error, /busy.*try again/i);
+});

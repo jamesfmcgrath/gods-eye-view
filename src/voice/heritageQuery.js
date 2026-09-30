@@ -45,6 +45,9 @@ function describeTypes(keys) {
     : 'recorded monuments';
 }
 
+const SNAPSHOT_MISSING =
+  'The monuments data has not been downloaded. Tell the user to run npm run smr:snapshot and restart the app.';
+
 /** Answer heritage_query from the local /api/heritage/smr route. */
 export async function runHeritageQuery(
   args,
@@ -64,11 +67,16 @@ export async function runHeritageQuery(
     );
     if (response.status === 404)
       return { ok: false, error: 'That monument is not in the record.' };
-    if (response.status === 503)
+    if (response.status === 503) {
+      const body = await response.json().catch(() => null);
       return {
         ok: false,
-        error: 'The monument service is busy. Try again in a minute.',
+        error:
+          body?.error === 'smr_snapshot_missing'
+            ? SNAPSHOT_MISSING
+            : 'The monument service is busy. Try again in a minute.',
       };
+    }
     if (!response.ok)
       return { ok: false, error: 'Monument data is unavailable right now.' };
     const r = await response.json();
@@ -130,12 +138,7 @@ export async function runHeritageQuery(
     `${API}/${mode === 'nearest' ? 'nearest' : 'stats'}?${params}`,
     { signal },
   );
-  if (response.status === 503)
-    return {
-      ok: false,
-      error:
-        'The monuments data has not been downloaded. Tell the user to run npm run smr:snapshot and restart the app.',
-    };
+  if (response.status === 503) return { ok: false, error: SNAPSHOT_MISSING };
   if (!response.ok)
     return { ok: false, error: 'Monument data is unavailable right now.' };
   const body = await response.json();

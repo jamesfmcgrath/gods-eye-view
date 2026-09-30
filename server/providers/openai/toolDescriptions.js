@@ -607,7 +607,7 @@ export const ACTION_DESCRIPTIONS = {
       properties: {
         mode: {
           description:
-            '"count" for how many; "nearest" for where is the closest or take me to.',
+            '"count" for how many; "nearest" for where is the closest or take me to; "describe" (with smrs) for what a monument is.',
           $position: 2,
         },
         types: {

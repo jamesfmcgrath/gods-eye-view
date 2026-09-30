@@ -24,7 +24,7 @@ Monuments (SMR) layer    heritage_query voice tool
 ```
 
 - **Why a local snapshot.** The SMR ArcGIS service allows 3,000 request units per minute, shared by every consumer, including the government's own viewer. The bulk data never comes from a runtime query. Only `npm run smr:snapshot` downloads it, and it pauses between pages and backs off on rate limits.
-- **Descriptions on demand.** The snapshot holds no description text. When a monument is selected, `/api/heritage/smr/record` fetches that one monument's published description from the National Monuments Service and caches it on disk in `.gev-cache/smr/records/` for 30 days. The server makes at most 30 upstream requests per minute and pauses for 60 seconds after an upstream rate limit. The SMR number must exist in the local snapshot. Placeholder notes ("has not been uploaded") are returned as no description. About 88% of records have a published description (133,776 of 151,308 on 2026-09-30).
+- **Descriptions on demand.** The snapshot holds no description text. When a monument is selected, `/api/heritage/smr/record` fetches that one monument's published description from the National Monuments Service and caches it on disk in `.gev-cache/smr/records/` for 30 days. The server makes at most 30 upstream requests in any rolling 60 seconds and pauses for 60 seconds after an upstream rate limit. The SMR number must exist in the local snapshot. Placeholder notes ("has not been uploaded") are returned as no description. About 88% of records have a published description (133,776 of 151,308 on 2026-09-30).
 - **What is counted.** The service lists about 151,300 records. About 10,900 have no mapped location in the national record and are excluded, leaving about 140,400 located records. Every map point and voice count covers located records only.
 - **Coverage.** The Republic of Ireland only. Northern Ireland is a separate dataset and is not included.
 
@@ -58,8 +58,8 @@ Refresh the data by running `npm run smr:snapshot` again, then restarting the de
    The palette is based on Okabe-Ito, so the families stay distinguishable under common colour-vision deficiencies. Colour is not the only cue: the class shows on the selection card and in voice answers.
 
 5. Click a point to select it. A card shows the class, townland, county and SMR number, plus up to 3 wrapped lines of the description once it loads. Clicking empty space clears the selection. Clicks are ignored while another tool holds the pointer, such as Directions SET A/B or drawing.
-6. The Monuments (SMR) row also shows the selected monument: a heading ("class, townland"), a line "Co. county · SMR number", and the description text (scrollable and keyboard-focusable). While it loads the row reads "Loading description…". If none is published it reads "No description has been published for this record yet.", and if the service cannot be reached it reads "Description unavailable right now. Try selecting it again shortly."
-7. The row ends with a link, "View full record (Historic Environment Viewer) (opens in a new tab)".
+6. The Monuments (SMR) row also shows the selected monument: a heading ("class, townland"), a line "Co. county · SMR number", and the description text (scrollable and keyboard-focusable). While it loads the row reads "Loading description…". If none is published it reads "No description has been published for this record yet.", and if the service cannot be reached it reads "Description unavailable right now. Try selecting it again shortly." Screen readers hear only a short status ("Loading description for class, townland", then "description loaded", "no description published" or "description unavailable"), never the description itself; the section is named by its heading.
+7. The row ends with a link, "View full record in the Historic Environment Viewer (opens in a new tab)".
 
 ## Using voice
 
@@ -102,7 +102,7 @@ nvm use 24
 npm test                     # full suite (includes every heritage test)
 npm run format:check
 npm run check:boundaries
-npm run layer-token:check -- --base-ref origin/main
+npm run layer-token:check -- --base-ref upstream/main
 npm run build
 ```
 
@@ -144,7 +144,7 @@ These have not been run yet.
 3. Click a point. A card shows the class, townland, county and SMR number. Click empty ground and the card clears.
 4. Arm Directions **SET A** and click a monument. The monument is not selected.
 5. Check that the credits list includes "Monuments: National Monuments Service, Government of Ireland (CC BY 4.0)".
-6. Click a point. The Monuments row shows the description, and the card shows up to 3 excerpt lines. Press Tab: focus reaches the description text and then the "View full record" link. The link opens the Historic Environment Viewer in a new tab.
+6. Click a point. The Monuments row shows the description, and the card shows up to 3 excerpt lines. Press Tab: focus reaches the description text and then the "View full record in the Historic Environment Viewer" link. The link opens the Historic Environment Viewer in a new tab.
 7. Stop the server, rename `.gev-cache/smr/snapshot.json`, restart, and turn on the layer. The row shows "SMR snapshot missing: run npm run smr:snapshot". Rename the file back.
 
 ### Manual voice checks
