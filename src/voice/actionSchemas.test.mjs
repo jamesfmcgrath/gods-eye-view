@@ -29,7 +29,7 @@ test('the complete Realtime tool payload pins the additive analyst, satellite, L
     digest,
     // Re-derived for the additive heritage_query tool and heritage-smr layer
     // enum values; the separate sonar tool is excluded above.
-    '9327ef416afae702f842a43508f06bfadbcf279da7bec0cbc4d628ee1c5fdaf7',
+    '5804c28621cddd9fd05adb83ce1b519f71b7134a124b2b93ee4e43f1879f0d81',
   );
 });
 

@@ -5,6 +5,10 @@ const API = '/api/heritage/smr';
 const STATS_MAX_SPAN_DEG = 12;
 const ATTRIBUTION =
   'Sites and Monuments Record: National Monuments Service, Government of Ireland (CC BY 4.0)';
+const DESCRIBE_LIMIT = 3000;
+const SMRS_PATTERN = /^[A-Z0-9*-]{6,20}$/;
+const NO_DESCRIPTION =
+  'The record has no published description for this site yet.';
 const COVERAGE_NOTE =
   'The Sites and Monuments Record covers the Republic of Ireland only. Zero here does not mean there are no monuments outside that coverage.';
 
@@ -46,6 +50,45 @@ export async function runHeritageQuery(
   args,
   { getView, fetchImpl = (...a) => globalThis.fetch(...a), signal } = {},
 ) {
+  if (args?.mode === 'describe') {
+    const smrs = typeof args.smrs === 'string' ? args.smrs.trim() : '';
+    if (!SMRS_PATTERN.test(smrs))
+      return {
+        ok: false,
+        error:
+          'Say which monument: select it on the map, or find one with the nearest mode first.',
+      };
+    const response = await fetchImpl(
+      `${API}/record?${new URLSearchParams({ smrs })}`,
+      { signal },
+    );
+    if (response.status === 404)
+      return { ok: false, error: 'That monument is not in the record.' };
+    if (response.status === 503)
+      return {
+        ok: false,
+        error: 'The monument service is busy. Try again in a minute.',
+      };
+    if (!response.ok)
+      return { ok: false, error: 'Monument data is unavailable right now.' };
+    const r = await response.json();
+    const text = typeof r.description === 'string' ? r.description : null;
+    return {
+      ok: true,
+      mode: 'describe',
+      name: `${r.monumentClass}, ${r.townland}`,
+      monumentClass: r.monumentClass,
+      townland: r.townland,
+      county: r.county,
+      smrs: r.smrs,
+      hasDescription: Boolean(text),
+      description: text ? text.slice(0, DESCRIBE_LIMIT) : null,
+      truncated: Boolean(text && text.length > DESCRIBE_LIMIT),
+      link: r.link,
+      attribution: ATTRIBUTION,
+      ...(text ? {} : { note: NO_DESCRIPTION }),
+    };
+  }
   const mode = args?.mode === 'nearest' ? 'nearest' : 'count';
   const types = (Array.isArray(args?.types) ? args.types : [])
     .filter((key) => Object.hasOwn(HERITAGE_TYPES, key))
