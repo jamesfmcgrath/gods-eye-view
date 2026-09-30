@@ -1,4 +1,5 @@
 import { makeRateLimiter, clientKey } from './common/rate-limit.js';
+import { createSmrRecordFetcher, isSmrsId } from './heritage/records.js';
 import { createSmrIndex } from './heritage/smrIndex.js';
 import {
   loadSmrSnapshotFile,
@@ -9,7 +10,7 @@ import {
 } from './heritage/snapshot.js';
 import { parseHeritageTypes } from '../../src/data/heritageClasses.js';
 
-const ROUTES = new Set(['/status', '/points', '/stats', '/nearest']);
+const ROUTES = new Set(['/status', '/points', '/stats', '/nearest', '/record']);
 const POINTS_MAX_SPAN_DEG = 1.5;
 const STATS_MAX_SPAN_DEG = 12;
 
@@ -41,6 +42,9 @@ function readBox(params, maxSpan) {
 /** Local-snapshot SMR queries for dev and preview; never contacts the SMR service. */
 export function heritageProxy({
   loadSnapshot = () => loadSmrSnapshotFile(SMR_SNAPSHOT_PATH),
+  recordFetcher = createSmrRecordFetcher({
+    fetchImpl: (...args) => globalThis.fetch(...args),
+  }),
 } = {}) {
   let indexPromise = null;
   const allow = makeRateLimiter({
@@ -62,13 +66,14 @@ export function heritageProxy({
   }
 
   async function handler(req, res) {
-    const json = (status, value) => {
+    const json = (status, value, headers = {}) => {
       if (res.destroyed) return;
       res.writeHead(status, {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store',
         ...(status === 405 ? { Allow: 'GET' } : {}),
         ...(status === 429 ? { 'Retry-After': '60' } : {}),
+        ...headers,
       });
       res.end(JSON.stringify(value));
     };
@@ -105,6 +110,31 @@ export function heritageProxy({
 
     if (route === '/status')
       return json(200, { ready: true, count: index.count, ...meta });
+
+    if (route === '/record') {
+      const smrs = params.get('smrs') || '';
+      if (!isSmrsId(smrs)) return json(400, { error: 'invalid_smrs' });
+      const record = index.find(smrs);
+      if (!record) return json(404, { error: 'unknown_smrs' });
+      try {
+        const found = await recordFetcher.get(smrs);
+        return json(200, {
+          ...record,
+          description: found.description,
+          descriptionFetchedAt: found.fetchedAt,
+          cached: found.cached,
+          ...meta,
+        });
+      } catch (error) {
+        if (error?.code === 'SMR_UPSTREAM_BUSY')
+          return json(
+            503,
+            { error: 'description_busy' },
+            { 'Retry-After': '60' },
+          );
+        return json(502, { error: 'description_unavailable' });
+      }
+    }
 
     if (route === '/points') {
       const box = readBox(params, POINTS_MAX_SPAN_DEG);

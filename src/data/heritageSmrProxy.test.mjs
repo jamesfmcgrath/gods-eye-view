@@ -11,6 +11,7 @@ const snapshot = {
   rows: [
     ['MA1', 1, 0, 'A', 53.88, -9.55],
     ['MA4', 0, 0, 'Rockfleet', 53.896, -9.627],
+    ['MA070-110----', 0, 0, 'Corraun', 53.93, -9.8],
   ],
 };
 
@@ -34,7 +35,7 @@ test('status reports the loaded snapshot with attribution', async () => {
   const res = await get('/status');
   assert.equal(res.status, 200);
   assert.equal(res.headers['Cache-Control'], 'no-store');
-  assert.equal(res.json.count, 2);
+  assert.equal(res.json.count, 3);
   assert.equal(res.json.attribution, 'National Monuments Service, Government of Ireland');
 });
 
@@ -100,4 +101,30 @@ test('the per-client limit stops a loop', async () => {
   for (let i = 0; i < 241; i++) last = await get('/status', { ip: '10.0.0.9' });
   assert.equal(last.status, 429);
   assert.equal((await get('/status', { ip: '10.0.0.10' })).status, 200);
+});
+
+test('record returns the local record plus its description', async () => {
+  const get = install({ loadSnapshot: async () => snapshot, recordFetcher: { get: async (smrs) => ({ smrs, description: 'A tower house.', fetchedAt: 'x', cached: false }) } });
+  const res = await get('/record?smrs=MA070-110----');
+  assert.equal(res.status, 200);
+  assert.equal(res.json.townland, 'Corraun');
+  assert.equal(res.json.description, 'A tower house.');
+  assert.equal(res.json.attribution, 'National Monuments Service, Government of Ireland');
+});
+
+test('record rejects malformed and unknown ids without fetching', async () => {
+  let fetched = 0;
+  const get = install({ loadSnapshot: async () => snapshot, recordFetcher: { get: async () => { fetched++; return {}; } } });
+  assert.equal((await get("/record?smrs=MA1'%20OR%201=1")).json.error, 'invalid_smrs');
+  assert.equal((await get('/record?smrs=MA999-999----')).status, 404);
+  assert.equal(fetched, 0);
+});
+
+test('record maps busy and failed upstreams to 503 and 502', async () => {
+  const busy = install({ loadSnapshot: async () => snapshot, recordFetcher: { get: async () => { throw Object.assign(new Error('x'), { code: 'SMR_UPSTREAM_BUSY' }); } } });
+  const res = await busy('/record?smrs=MA070-110----');
+  assert.equal(res.status, 503);
+  assert.equal(res.headers['Retry-After'], '60');
+  const failed = install({ loadSnapshot: async () => snapshot, recordFetcher: { get: async () => { throw new Error('/secret'); } } });
+  assert.deepEqual((await failed('/record?smrs=MA070-110----')).json, { error: 'description_unavailable' });
 });

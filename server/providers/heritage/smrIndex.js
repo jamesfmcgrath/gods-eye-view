@@ -26,6 +26,8 @@ export function createSmrIndex(snapshot) {
     bounds.east = Math.max(bounds.east, row[5]);
   });
 
+  const bySmrs = new Map(rows.map((row, i) => [row[0], i]));
+
   const masks = new Map();
   function classMask(types = []) {
     const key = types.join(',');
@@ -116,6 +118,10 @@ export function createSmrIndex(snapshot) {
     count: rows.length,
     bounds,
     fetchedAt,
+    find(smrs) {
+      const i = bySmrs.get(smrs);
+      return i === undefined ? null : toRecord(i);
+    },
     points({ box, types, limit }) {
       const ids = matching({ box, types });
       if (ids.length > limit)
