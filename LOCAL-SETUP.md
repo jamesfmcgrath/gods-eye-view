@@ -211,12 +211,14 @@ Then turn on **Monuments (SMR)** under **Heritage** in the layers panel and zoom
 
 Status (2026-09-29):
 
-- 14 commits on the branch; all CI-equivalent checks pass (tests, format, boundaries, layer tokens, build).
+- 22 commits on the feature branch; all CI-equivalent checks pass (tests, format, boundaries, layer tokens, build).
 - Pushed to your public fork https://github.com/jamesfmcgrath/gods-eye-view (branch `feat/smr-heritage-layer`) on 2026-09-30. Nothing has been proposed upstream.
 - Remotes: `origin` = your fork, `upstream` = bilawalsidhu/gods-eye-view with pushing disabled (`upstream DISABLE (push)`). Get upstream updates with `git fetch upstream` then `git merge upstream/main` on `main`, and `git push origin main`.
 - Not yet checked by hand: the browser checks and voice checks listed in `docs/HERITAGE-SMR.md`.
 - The snapshot holds 140,428 located records; about 10,900 service records have no mapped location and are excluded.
 - Follow-up: on-map class labels (native Cesium labels are banned by the repo; needs the world-overlay label system).
+- 2026-09-30: added monument descriptions and record links. Select a monument: the Monuments row in the layers panel shows its published description (about 88% of records have one) and a "View full record in the Historic Environment Viewer" link; the map card shows a short excerpt; voice "what is this?" summarises the description. Descriptions are fetched on demand from the National Monuments Service and cached for 30 days in `.gev-cache/smr/records/`, so the first view of each monument needs a connection. Plan: `docs/superpowers/plans/2026-09-30-smr-descriptions.md`.
+- Next planned: flag the 100 "Monuments to Visit" sites, and Wikipedia/Wikidata summaries for notable sites.
 - To return to the main app: `git switch main`.
 
 ## Security notes
