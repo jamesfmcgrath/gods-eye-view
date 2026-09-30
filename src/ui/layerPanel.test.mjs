@@ -314,3 +314,79 @@ test('row detail renders accessible reused nodes and only https links', async ()
     globalThis.document = previousDocument;
   }
 });
+
+test('legend, chips and info rebuilt after the detail still render before it', async () => {
+  const { LayerPanel } = await import('./layerPanel.js');
+  const { railFixture } = await import('./railTestFixture.mjs');
+  const f = railFixture();
+  const previousDocument = globalThis.document;
+  const createElement = f.document.createElement;
+  f.document.createElement = (tag) => {
+    const node = createElement(tag);
+    node.removeAttribute = (key) => node.attributes.delete(key);
+    return node;
+  };
+  globalThis.document = f.document;
+  let controls = {
+    detail: { heading: 'Castle - tower house, Corraun', text: 'In pasture…' },
+  };
+  const layers = [
+    {
+      id: 'other',
+      name: 'other',
+      icon: '*',
+      source: 'Source',
+      enabled: true,
+      showInTogglePanel: true,
+      stats: {},
+    },
+  ];
+  const panel = new LayerPanel({
+    getLayers: () => layers,
+    isEnabled: () => true,
+    setEnabled() {},
+    setLayerParams() {},
+    hasRowControls: () => true,
+    subscribeRowControls() {},
+    getRowControls: () => controls,
+  });
+  try {
+    panel.mount(f.container);
+    const row = f.find((n) => n.dataset.layerId === 'other');
+    const container = row.querySelector('.data-toggle-controls');
+    const sync = () => panel._syncRowControls(container, layers[0]);
+    const section = row.querySelector('.data-toggle-detail');
+    assert.ok(section, 'detail rendered first');
+    assert.equal(container.children.at(-1), section);
+
+    controls = {
+      ...controls,
+      legend: [{ label: 'Castles', color: '#fff', count: 1 }],
+    };
+    sync();
+    controls = {
+      ...controls,
+      legend: [{ label: 'Castles', color: '#fff', count: 2 }],
+    };
+    sync();
+    assert.equal(
+      container.children.at(-1),
+      section,
+      'legend rebuilt before detail',
+    );
+    controls = {
+      ...controls,
+      chips: [{ id: 'a', label: 'A' }],
+      info: 'Some info',
+    };
+    sync();
+    const classes = container.children.map((node) => node.className);
+    assert.equal(container.children.at(-1), section, classes.join(', '));
+    assert.ok(classes.includes('data-toggle-legend-item'));
+    assert.ok(classes.includes('data-toggle-controls-info'));
+    assert.ok(classes.some((name) => name.startsWith('data-toggle-chip')));
+  } finally {
+    panel.destroy();
+    globalThis.document = previousDocument;
+  }
+});

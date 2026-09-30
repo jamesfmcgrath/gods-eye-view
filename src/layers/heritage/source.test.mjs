@@ -32,3 +32,26 @@ test('a missing snapshot rejects with a recognisable code', async () => {
   const source = createHeritageSource({ fetchImpl: async () => Response.json({ error: 'smr_snapshot_missing' }, { status: 503 }) });
   await assert.rejects(source.fetch(box), (error) => error.code === 'smr_snapshot_missing');
 });
+
+test('describe calls the fixed record route with the SMR number and signal', async () => {
+  let seen;
+  const record = { id: 'smr:MA070-110----', smrs: 'MA070-110----', description: 'In pasture.' };
+  const source = createHeritageSource({
+    fetchImpl: async (url, options) => {
+      seen = { url: new URL(url, 'http://x'), signal: options.signal };
+      return Response.json(record);
+    },
+  });
+  const signal = new AbortController().signal;
+  assert.deepEqual(await source.describe('MA070-110----', signal), record);
+  assert.equal(seen.url.pathname, '/api/heritage/smr/record');
+  assert.equal(seen.url.searchParams.get('smrs'), 'MA070-110----');
+  assert.equal(seen.signal, signal);
+});
+
+test('describe rejects a busy upstream with a recognisable code and other failures plainly', async () => {
+  const busy = createHeritageSource({ fetchImpl: async () => Response.json({ error: 'description_busy' }, { status: 503 }) });
+  await assert.rejects(busy.describe('MA1'), (error) => error.code === 'description_busy');
+  const failed = createHeritageSource({ fetchImpl: async () => Response.json({ error: 'description_unavailable' }, { status: 502 }) });
+  await assert.rejects(failed.describe('MA1'), (error) => error instanceof Error && error.code === undefined);
+});

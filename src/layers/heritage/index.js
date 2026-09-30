@@ -49,6 +49,80 @@ function heritageDetails(record) {
   ];
 }
 
+const DETAIL_TEXT = {
+  loading: 'Loading description…',
+  none: 'No description has been published for this record yet.',
+  error: 'Description unavailable right now. Try selecting it again shortly.',
+};
+
+/** Word-wrapped readout excerpt; the last line ends with … when text remains. */
+export function excerptLines(text, { width = 46, lines = 3 } = {}) {
+  const words = String(text ?? '')
+    .split(/\s+/)
+    .filter(Boolean);
+  const out = [];
+  let line = '';
+  let index = 0;
+  while (index < words.length && out.length < lines) {
+    const word = words[index];
+    if (!line && word.length > width) {
+      out.push(`${word.slice(0, width - 1)}…`);
+      return out;
+    }
+    if (!line || line.length + 1 + word.length <= width) {
+      line = line ? `${line} ${word}` : word;
+      index += 1;
+    } else {
+      out.push(line);
+      line = '';
+    }
+  }
+  if (line) out.push(line);
+  if (index < words.length && out.length) {
+    let last = out[out.length - 1];
+    // Drop whole words until the ellipsis fits inside the width.
+    while (last.length + 1 > width && last.includes(' '))
+      last = last.slice(0, last.lastIndexOf(' '));
+    if (last.length + 1 > width) last = last.slice(0, width - 1);
+    out[out.length - 1] = `${last}…`;
+  }
+  return out;
+}
+
+function entityContext(record, dataSource) {
+  return {
+    id: record.id,
+    layerId: LAYER_ID,
+    dataSource,
+    layerName: LAYER_NAME,
+    source: 'National Monuments Service SMR',
+    label: record.monumentClass,
+    latitude: record.latitude,
+    longitude: record.longitude,
+    properties: {
+      name: `${record.monumentClass}, ${record.townland}`,
+      monumentClass: record.monumentClass,
+      townland: record.townland,
+      county: record.county,
+      smrs: record.smrs,
+      link: record.link,
+    },
+  };
+}
+
+function rowDetail({ record, status, description }) {
+  return {
+    label: 'Selected monument',
+    heading: `${record.monumentClass}, ${record.townland}`,
+    meta: `Co. ${record.county} · SMR ${record.smrs}`,
+    text: status === 'ready' ? description : DETAIL_TEXT[status],
+    link: {
+      href: record.link,
+      label: 'View full record (Historic Environment Viewer)',
+    },
+  };
+}
+
 /** Viewport-driven Sites and Monuments Record points from the local snapshot route. */
 export function createHeritageLayer({ source, services } = {}) {
   if (typeof source?.fetch !== 'function')
@@ -78,6 +152,9 @@ export function createHeritageLayer({ source, services } = {}) {
     removeMoveEnd: null,
     clickHandler: null,
     selectedId: null,
+    detail: null,
+    detailAbort: null,
+    rowControlsListener: null,
     status: 'idle',
     error: null,
     lastUpdate: null,
@@ -128,24 +205,7 @@ export function createHeritageLayer({ source, services } = {}) {
       details: heritageDetails(record),
       accent: color.toCssColorString(),
     };
-    registerEntityContext(entity, {
-      id: record.id,
-      layerId: LAYER_ID,
-      dataSource: state.dataSource,
-      layerName: LAYER_NAME,
-      source: 'National Monuments Service SMR',
-      label: record.monumentClass,
-      latitude: record.latitude,
-      longitude: record.longitude,
-      properties: {
-        name: `${record.monumentClass}, ${record.townland}`,
-        monumentClass: record.monumentClass,
-        townland: record.townland,
-        county: record.county,
-        smrs: record.smrs,
-        link: record.link,
-      },
-    });
+    registerEntityContext(entity, entityContext(record, state.dataSource));
   }
 
   /** Ground height under a record: rendered surface, then globe, then cached floor. */
@@ -203,8 +263,10 @@ export function createHeritageLayer({ source, services } = {}) {
       entities.resumeEvents();
     }
     state.recordById = next;
-    if (state.selectedId && !next.has(state.selectedId))
+    if (state.selectedId && !next.has(state.selectedId)) {
       state.selectedId = null;
+      cancelDetail();
+    }
     removeEntityContextsForLayer(LAYER_ID, { retainIds: new Set(next.keys()) });
     governorRequestRender('heritage-render');
   }
@@ -249,8 +311,60 @@ export function createHeritageLayer({ source, services } = {}) {
     }
   }
 
+  function notifyRow() {
+    state.rowControlsListener?.();
+  }
+
+  function cancelDetail() {
+    state.detailAbort?.abort();
+    state.detailAbort = null;
+    if (!state.detail) return;
+    state.detail = null;
+    notifyRow();
+  }
+
+  /** Fetch the selected record's description for the row detail and readout. */
+  async function loadDetail(record) {
+    state.detailAbort?.abort();
+    const request = new AbortController();
+    state.detailAbort = request;
+    state.detail = { record, status: 'loading', description: null };
+    notifyRow();
+    let status;
+    let description = null;
+    try {
+      const body = await source.describe(record.smrs, request.signal);
+      description =
+        typeof body?.description === 'string' && body.description.trim()
+          ? body.description
+          : null;
+      status = description ? 'ready' : 'none';
+    } catch {
+      status = 'error';
+    }
+    if (request.signal.aborted || state.selectedId !== record.id) return;
+    state.detailAbort = null;
+    state.detail = { record, status, description };
+    const entity = state.dataSource?.entities.getById(record.id);
+    if (entity) {
+      entity.gevLabelModel.details = [
+        ...heritageDetails(record),
+        ...(status === 'ready' ? excerptLines(description) : []),
+      ];
+      const context = entityContext(record, state.dataSource);
+      registerEntityContext(entity, {
+        ...context,
+        properties: { ...context.properties, description },
+      });
+      services.overlays?.refreshReadout?.(entity);
+    }
+    governorRequestRender('heritage-detail');
+    notifyRow();
+  }
+
   function clearSelection() {
     state.selectedId = null;
+    cancelDetail();
     clearSelectedEntityContextForLayer(LAYER_ID);
     governorRequestRender('heritage-selection');
   }
@@ -265,6 +379,8 @@ export function createHeritageLayer({ source, services } = {}) {
       state.selectedId = id;
       selectEntityContext(state.dataSource.entities.getById(id));
       governorRequestRender('heritage-selection');
+      if (typeof source.describe === 'function')
+        loadDetail(state.recordById.get(id));
       return;
     }
     // A pick owned by a sibling layer is not empty space; that layer handles it.
@@ -308,6 +424,7 @@ export function createHeritageLayer({ source, services } = {}) {
       state.loading = false;
       unregisterPickOwner(LAYER_ID);
       state.selectedId = null;
+      cancelDetail();
       clearSelectedEntityContextForLayer(LAYER_ID);
       render([]);
       if (state.dataSource) state.dataSource.show = false;
@@ -324,6 +441,10 @@ export function createHeritageLayer({ source, services } = {}) {
       if (state.dataSource) viewer?.dataSources.remove(state.dataSource, true);
       state.dataSource = null;
       state.viewer = null;
+    },
+    setRowControlsListener(listener) {
+      state.rowControlsListener =
+        typeof listener === 'function' ? listener : null;
     },
     getRowControls() {
       const counts = new Map();
@@ -346,6 +467,7 @@ export function createHeritageLayer({ source, services } = {}) {
               : {}),
           }),
         ),
+        ...(state.detail ? { detail: rowDetail(state.detail) } : {}),
       };
     },
     getStats() {

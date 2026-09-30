@@ -422,7 +422,11 @@ export class LayerPanel {
     const info = container._rowControlsInfo || null;
     const firstLegend = container.querySelector('.data-toggle-legend-item');
 
-    syncChipGroup(container, chips, { before: firstLegend || info });
+    // The detail section is the final anchor so it always stays last.
+    const detailNode = container._rowDetail || null;
+    syncChipGroup(container, chips, {
+      before: firstLegend || info || detailNode,
+    });
 
     const legendSignature = JSON.stringify(
       legend.map(({ label, color, count, blurb }) => [
@@ -449,14 +453,14 @@ export class LayerPanel {
             ? String(item.label)
             : `${item.label} ${this._formatCount(item.count)}`;
         entry.append(swatch, text);
-        container.insertBefore(entry, info);
+        container.insertBefore(entry, info || detailNode);
       }
       container._legendSignature = legendSignature;
     }
     if (infoText || info) {
       const node = info || document.createElement('div');
       if (!info) {
-        container.appendChild(node);
+        container.insertBefore(node, detailNode);
         container._rowControlsInfo = node;
       }
       const className = 'data-toggle-controls-info';

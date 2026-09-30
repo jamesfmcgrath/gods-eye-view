@@ -1,6 +1,6 @@
 import { API_BASE, QUERY_LIMIT } from './policy.js';
 
-/** Browser source for the local /api/heritage/smr/points route. */
+/** Browser source for the local /api/heritage/smr/points and /record routes. */
 export function createHeritageSource({
   fetchImpl = (...args) => globalThis.fetch(...args),
   baseUrl = API_BASE,
@@ -26,6 +26,21 @@ export function createHeritageSource({
       if (!response.ok)
         throw new Error(`Heritage request failed (${response.status})`);
       return validateHeritagePoints(await response.json());
+    },
+    async describe(smrs, signal) {
+      const response = await fetchImpl(
+        `${baseUrl}/record?${new URLSearchParams({ smrs })}`,
+        { signal },
+      );
+      if (response.status === 503) {
+        await response.body?.cancel();
+        throw Object.assign(new Error('SMR description busy'), {
+          code: 'description_busy',
+        });
+      }
+      if (!response.ok)
+        throw new Error(`Heritage record failed (${response.status})`);
+      return response.json();
     },
   };
 }
