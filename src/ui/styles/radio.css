@@ -936,6 +936,15 @@
   color: inherit;
   text-decoration: underline;
 }
+/* Visually hidden; announces short detail status to screen readers. */
+.data-toggle-detail-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 /* ── Local RTL-SDR card (FM + Local ADS-B receiver) ── */
 .sdr-radio-card {
   display: grid;

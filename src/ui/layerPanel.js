@@ -16,6 +16,8 @@ const FEED_STATE_LABELS = Object.freeze({
 });
 
 // Presentation order is independent of catalog registration and startup order.
+// Gives each row detail heading a document-unique id for aria-labelledby.
+let detailHeadingSeq = 0;
 const PANEL_GROUPS = [
   {
     label: 'Movement',
@@ -416,13 +418,14 @@ export class LayerPanel {
     const infoText = controls?.info;
     const detail = controls?.detail || null;
     this._syncRowList(listContainer, controls?.list || null);
-    container.hidden =
+    const hidden =
       chips.length === 0 && legend.length === 0 && !infoText && !detail;
+    if (container.hidden !== hidden) container.hidden = hidden;
 
     const info = container._rowControlsInfo || null;
     const firstLegend = container.querySelector('.data-toggle-legend-item');
 
-    // The detail section is the final anchor so it always stays last.
+    // The detail section is the final anchor so it stays last (before only its status node).
     const detailNode = container._rowDetail || null;
     syncChipGroup(container, chips, {
       before: firstLegend || info || detailNode,
@@ -478,14 +481,19 @@ export class LayerPanel {
   /**
    * Render a row's selected-item detail (heading, meta, scrollable text, link).
    * Real HTML so screen readers and keyboards reach it; nodes are reused so a
-   * refresh never drops focus from the scrollable text or the link.
+   * refresh never drops focus from the scrollable text or the link. The section
+   * is not a live region (descriptions can be long); a separate visually hidden
+   * `role="status"` node, kept in the DOM while the section is hidden, carries
+   * only the short `detail.status` text.
    * @param {HTMLElement} container The row's `.data-toggle-controls` node.
-   * @param {object|null} detail `{ label, heading, meta, text, link: { href, label } }`.
+   * @param {object|null} detail `{ label, heading, meta, text, status, link: { href, label } }`.
    */
   _syncRowDetail(container, detail) {
     let node = container._rowDetail || null;
+    const status = container._rowDetailStatus || null;
     if (!detail) {
       if (node && !node.hidden) node.hidden = true;
+      if (status && status.textContent !== '') status.textContent = '';
       return;
     }
     const part = (tag, className) => {
@@ -497,8 +505,8 @@ export class LayerPanel {
     if (!node) {
       node = document.createElement('section');
       node.className = 'data-toggle-detail';
-      node.setAttribute('aria-live', 'polite');
       node._heading = part('p', 'data-toggle-detail-heading');
+      node._heading.id = `data-toggle-detail-heading-${++detailHeadingSeq}`;
       node._meta = part('p', 'data-toggle-detail-meta');
       node._text = part('p', 'data-toggle-detail-text');
       node._text.tabIndex = 0;
@@ -507,6 +515,11 @@ export class LayerPanel {
       node._link.rel = 'noopener noreferrer';
       container.appendChild(node);
       container._rowDetail = node;
+      const live = document.createElement('div');
+      live.className = 'data-toggle-detail-status';
+      live.setAttribute('role', 'status');
+      container.appendChild(live);
+      container._rowDetailStatus = live;
     }
     const setText = (element, value) => {
       const text = value ? String(value) : '';
@@ -514,10 +527,20 @@ export class LayerPanel {
       if (element.hidden !== !text) element.hidden = !text;
     };
     if (node.hidden) node.hidden = false;
-    const label = detail.label || 'Selected item';
-    if (node.getAttribute('aria-label') !== label)
-      node.setAttribute('aria-label', label);
     setText(node._heading, detail.heading);
+    // Name the section by its visible heading; fall back to a generic label.
+    if (detail.heading) {
+      if (node.getAttribute('aria-labelledby') !== node._heading.id)
+        node.setAttribute('aria-labelledby', node._heading.id);
+      if (node.getAttribute('aria-label') !== null)
+        node.removeAttribute('aria-label');
+    } else {
+      const label = detail.label || 'Selected item';
+      if (node.getAttribute('aria-label') !== label)
+        node.setAttribute('aria-label', label);
+      if (node.getAttribute('aria-labelledby') !== null)
+        node.removeAttribute('aria-labelledby');
+    }
     setText(node._meta, detail.meta);
     setText(node._text, detail.text);
     let href = null;
@@ -533,7 +556,11 @@ export class LayerPanel {
     );
     if (href && node._link.getAttribute('href') !== href)
       node._link.setAttribute('href', href);
-    if (!href) node._link.removeAttribute('href');
+    if (!href && node._link.getAttribute('href') !== null)
+      node._link.removeAttribute('href');
+    const statusText = detail.status ? String(detail.status) : '';
+    const live = container._rowDetailStatus;
+    if (live.textContent !== statusText) live.textContent = statusText;
   }
 
   /**
