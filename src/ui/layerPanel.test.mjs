@@ -228,3 +228,89 @@ test('the Recent Imagery readout mounts in its rail body like the weather readou
     globalThis.document = previousDocument;
   }
 });
+
+test('row detail renders accessible reused nodes and only https links', async () => {
+  const { LayerPanel } = await import('./layerPanel.js');
+  const { railFixture } = await import('./railTestFixture.mjs');
+  const f = railFixture();
+  const previousDocument = globalThis.document;
+  // The shared fixture has no removeAttribute; add it for this test only.
+  const createElement = f.document.createElement;
+  f.document.createElement = (tag) => {
+    const node = createElement(tag);
+    node.removeAttribute = (key) => node.attributes.delete(key);
+    return node;
+  };
+  globalThis.document = f.document;
+  let detail = {
+    heading: 'Castle - tower house, Corraun',
+    meta: 'Co. Mayo · SMR MA070-110----',
+    text: 'In pasture…',
+    link: { href: 'https://example.org/r', label: 'View full record' },
+  };
+  const layers = [
+    {
+      id: 'other',
+      name: 'other',
+      icon: '*',
+      source: 'Source',
+      enabled: true,
+      showInTogglePanel: true,
+      stats: {},
+    },
+  ];
+  const panel = new LayerPanel({
+    getLayers: () => layers,
+    isEnabled: () => true,
+    setEnabled() {},
+    setLayerParams() {},
+    hasRowControls: () => true,
+    subscribeRowControls() {},
+    getRowControls: () => ({ detail }),
+  });
+  try {
+    panel.mount(f.container);
+    const row = f.find((n) => n.dataset.layerId === 'other');
+    // The fixture cannot resolve attribute selectors, so sync the row directly.
+    const sync = () =>
+      panel._syncRowControls(
+        row.querySelector('.data-toggle-controls'),
+        layers[0],
+      );
+    const section = row.querySelector('.data-toggle-detail');
+    assert.equal(section.getAttribute('aria-label'), 'Selected item');
+    assert.equal(section.getAttribute('aria-live'), 'polite');
+    assert.equal(
+      row.querySelector('.data-toggle-detail-heading').textContent,
+      'Castle - tower house, Corraun',
+    );
+    assert.equal(
+      row.querySelector('.data-toggle-detail-meta').textContent,
+      'Co. Mayo · SMR MA070-110----',
+    );
+    const text = row.querySelector('.data-toggle-detail-text');
+    assert.equal(text.textContent, 'In pasture…');
+    assert.equal(text.tabIndex, 0);
+    const link = row.querySelector('.data-toggle-detail-link');
+    assert.equal(link.getAttribute('href'), 'https://example.org/r');
+    assert.equal(link.target, '_blank');
+    assert.equal(link.rel, 'noopener noreferrer');
+    assert.equal(link.textContent, 'View full record (opens in a new tab)');
+
+    detail = { ...detail, text: 'Changed' };
+    sync();
+    assert.equal(row.querySelector('.data-toggle-detail'), section);
+    assert.equal(text.textContent, 'Changed');
+
+    detail = { ...detail, link: { href: 'javascript:alert(1)' } };
+    sync();
+    assert.equal(link.hidden, true);
+
+    detail = null;
+    sync();
+    assert.equal(section.hidden, true);
+  } finally {
+    panel.destroy();
+    globalThis.document = previousDocument;
+  }
+});

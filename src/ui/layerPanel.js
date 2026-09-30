@@ -414,8 +414,10 @@ export class LayerPanel {
     const chips = controls?.chips || [];
     const legend = controls?.legend || [];
     const infoText = controls?.info;
+    const detail = controls?.detail || null;
     this._syncRowList(listContainer, controls?.list || null);
-    container.hidden = chips.length === 0 && legend.length === 0 && !infoText;
+    container.hidden =
+      chips.length === 0 && legend.length === 0 && !infoText && !detail;
 
     const info = container._rowControlsInfo || null;
     const firstLegend = container.querySelector('.data-toggle-legend-item');
@@ -466,6 +468,68 @@ export class LayerPanel {
       const hidden = !text;
       if (node.hidden !== hidden) node.hidden = hidden;
     }
+    this._syncRowDetail(container, detail);
+  }
+
+  /**
+   * Render a row's selected-item detail (heading, meta, scrollable text, link).
+   * Real HTML so screen readers and keyboards reach it; nodes are reused so a
+   * refresh never drops focus from the scrollable text or the link.
+   * @param {HTMLElement} container The row's `.data-toggle-controls` node.
+   * @param {object|null} detail `{ label, heading, meta, text, link: { href, label } }`.
+   */
+  _syncRowDetail(container, detail) {
+    let node = container._rowDetail || null;
+    if (!detail) {
+      if (node && !node.hidden) node.hidden = true;
+      return;
+    }
+    const part = (tag, className) => {
+      const element = document.createElement(tag);
+      element.className = className;
+      node.appendChild(element);
+      return element;
+    };
+    if (!node) {
+      node = document.createElement('section');
+      node.className = 'data-toggle-detail';
+      node.setAttribute('aria-live', 'polite');
+      node._heading = part('p', 'data-toggle-detail-heading');
+      node._meta = part('p', 'data-toggle-detail-meta');
+      node._text = part('p', 'data-toggle-detail-text');
+      node._text.tabIndex = 0;
+      node._link = part('a', 'data-toggle-detail-link');
+      node._link.target = '_blank';
+      node._link.rel = 'noopener noreferrer';
+      container.appendChild(node);
+      container._rowDetail = node;
+    }
+    const setText = (element, value) => {
+      const text = value ? String(value) : '';
+      if (element.textContent !== text) element.textContent = text;
+      if (element.hidden !== !text) element.hidden = !text;
+    };
+    if (node.hidden) node.hidden = false;
+    const label = detail.label || 'Selected item';
+    if (node.getAttribute('aria-label') !== label)
+      node.setAttribute('aria-label', label);
+    setText(node._heading, detail.heading);
+    setText(node._meta, detail.meta);
+    setText(node._text, detail.text);
+    let href = null;
+    try {
+      const url = new URL(detail.link?.href || '');
+      if (url.protocol === 'https:') href = url.href;
+    } catch {
+      href = null;
+    }
+    setText(
+      node._link,
+      href ? `${detail.link.label || 'Open record'} (opens in a new tab)` : '',
+    );
+    if (href && node._link.getAttribute('href') !== href)
+      node._link.setAttribute('href', href);
+    if (!href) node._link.removeAttribute('href');
   }
 
   /**

@@ -908,6 +908,34 @@
   padding-top: 3px;
   overflow-wrap: anywhere;
 }
+.data-toggle-detail {
+  flex-basis: 100%;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.data-toggle-detail p {
+  margin: 0 0 4px;
+}
+.data-toggle-detail-heading {
+  font-weight: 600;
+}
+.data-toggle-detail-meta {
+  opacity: 0.8;
+}
+.data-toggle-detail-text {
+  max-height: 12em;
+  overflow-y: auto;
+}
+.data-toggle-detail-text:focus-visible,
+.data-toggle-detail-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.data-toggle-detail-link {
+  color: inherit;
+  text-decoration: underline;
+}
 /* ── Local RTL-SDR card (FM + Local ADS-B receiver) ── */
 .sdr-radio-card {
   display: grid;
