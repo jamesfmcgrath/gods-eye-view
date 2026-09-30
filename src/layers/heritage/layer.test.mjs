@@ -1,7 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import * as Cesium from 'cesium';
-import { createHeritageLayer, viewBox } from './index.js';
+import { createHeritageLayer, excerptLines, viewBox } from './index.js';
 import { HERITAGE_FAMILY_COLORS } from '../../data/heritageClasses.js';
 import { createTrackedOverlayEntry } from '../../data/trackedReadout.js';
 import { claimPointer, resetPointerOwnership } from '../../data/inputOwnership.js';
@@ -51,10 +51,13 @@ function fakeServices({ siblingIds = [] } = {}) {
   const registered = [];
   const selected = [];
   const cleared = [];
+  const refreshed = [];
   return {
     registered,
     selected,
     cleared,
+    refreshed,
+    overlays: { refreshReadout: (entity) => refreshed.push(entity) },
     render: { governorRequestRender() {} },
     picking: {
       registerPickOwner() {},
@@ -73,9 +76,9 @@ function fakeServices({ siblingIds = [] } = {}) {
 
 const inView = { south: 53.85, west: -9.65, north: 53.92, east: -9.5 };
 
-async function loadedLayer(records, { services = fakeServices(), groundHeight } = {}) {
+async function loadedLayer(records, { services = fakeServices(), groundHeight, describe = async () => ({ description: null }) } = {}) {
   const viewer = fakeViewer(inView, { groundHeight });
-  const layer = createHeritageLayer({ source: { fetch: async () => ({ records, total: records.length, saturated: false }) }, services });
+  const layer = createHeritageLayer({ source: { fetch: async () => ({ records, total: records.length, saturated: false }), describe }, services });
   layer.init(viewer);
   layer.enable(viewer);
   await layer.update(viewer);
@@ -209,4 +212,165 @@ test('the row legend names each colour family with its shown count', async () =>
       { label: 'Other', color: HERITAGE_FAMILY_COLORS.other, count: 0 },
     ],
   );
+});
+
+// Deferred describe calls, so each test controls when a description arrives.
+function deferredDescribe() {
+  const calls = [];
+  const describe = (smrs, signal) =>
+    new Promise((resolve, reject) => calls.push({ smrs, signal, resolve, reject }));
+  return { calls, describe };
+}
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+const castle = { id: 'smr:MA070-110----', smrs: 'MA070-110----', monumentClass: 'Castle - tower house', townland: 'Corraun', county: 'Mayo', latitude: 53.89, longitude: -9.56, link: 'https://heritagedata.maps.arcgis.com/r?smr=MA070-110----' };
+
+test('excerptLines wraps at word boundaries, caps the lines and marks truncation', () => {
+  assert.deepEqual(excerptLines('A short note.'), ['A short note.']);
+  const long = 'The remains of a tower house stand on a low rise in pasture overlooking the bay, with a vaulted ground floor and a spiral stair in the north-east angle.';
+  const lines = excerptLines(long);
+  assert.equal(lines.length, 3);
+  for (const line of lines) assert.ok(line.length <= 46, `${line.length}: ${line}`);
+  assert.ok(lines[2].endsWith('…'));
+  assert.ok(!lines[0].endsWith('…'));
+  assert.equal(long.startsWith(lines.join(' ').replace(/…$/, '')), true, 'words are kept whole and in order');
+  assert.deepEqual(excerptLines('x'.repeat(60), { width: 10, lines: 2 }), ['xxxxxxxxx…']);
+  assert.deepEqual(excerptLines(''), []);
+  assert.deepEqual(excerptLines(null), []);
+});
+
+test('selecting a monument loads its description into the row detail and readout', async () => {
+  const { calls, describe } = deferredDescribe();
+  const services = fakeServices();
+  const { viewer, layer } = await loadedLayer([castle], { services, describe });
+  let notified = 0;
+  layer.setRowControlsListener(() => { notified += 1; });
+  click(viewer, castle.id);
+  const loading = layer.getRowControls().detail;
+  assert.deepEqual(loading, {
+    label: 'Selected monument',
+    heading: 'Castle - tower house, Corraun',
+    meta: 'Co. Mayo · SMR MA070-110----',
+    text: 'Loading description…',
+    status: 'Loading description for Castle - tower house, Corraun',
+    link: { href: castle.link, label: 'View full record in the Historic Environment Viewer' },
+  });
+  assert.ok(notified >= 1, 'row listener fired on selection');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].smrs, 'MA070-110----');
+  const description = 'The remains of a tower house stand on a low rise in pasture overlooking the bay, with a vaulted ground floor.';
+  const before = notified;
+  calls[0].resolve({ ...castle, description });
+  await flush();
+  assert.equal(layer.getRowControls().detail.text, description);
+  assert.equal(layer.getRowControls().detail.status, 'Castle - tower house, Corraun: description loaded');
+  const entity = viewer.dataSource.entities.getById(castle.id);
+  assert.deepEqual(entity.gevLabelModel.details, [
+    'CORRAUN, CO. MAYO',
+    'SMR MA070-110----',
+    'SOURCE: NATIONAL MONUMENTS SERVICE',
+    ...excerptLines(description),
+  ]);
+  // Refreshed once when loading starts (base lines) and once with the excerpt.
+  assert.deepEqual(services.refreshed, [entity, entity]);
+  assert.ok(notified > before, 'row listener fired when the description arrived');
+  const context = services.registered.at(-1);
+  assert.equal(context.id, castle.id);
+  assert.equal(context.properties.description, description);
+  assert.equal(context.properties.smrs, 'MA070-110----');
+});
+
+test('a record without a published description says so and adds no excerpt', async () => {
+  const { calls, describe } = deferredDescribe();
+  const services = fakeServices();
+  const { viewer, layer } = await loadedLayer([castle], { services, describe });
+  click(viewer, castle.id);
+  calls[0].resolve({ ...castle, description: null });
+  await flush();
+  assert.equal(layer.getRowControls().detail.text, 'No description has been published for this record yet.');
+  assert.equal(layer.getRowControls().detail.status, 'Castle - tower house, Corraun: no description published');
+  assert.equal(viewer.dataSource.entities.getById(castle.id).gevLabelModel.details.length, 3);
+  assert.equal(services.registered.at(-1).properties.description, null);
+});
+
+test('a failed description keeps the record link and invites a retry', async () => {
+  const { calls, describe } = deferredDescribe();
+  const { viewer, layer } = await loadedLayer([castle], { describe });
+  click(viewer, castle.id);
+  calls[0].reject(Object.assign(new Error('busy'), { code: 'description_busy' }));
+  await flush();
+  const { detail } = layer.getRowControls();
+  assert.equal(detail.text, 'Description unavailable right now. Try selecting it again shortly.');
+  assert.equal(detail.status, 'Castle - tower house, Corraun: description unavailable');
+  assert.equal(detail.link.href, castle.link);
+});
+
+test('a late description for a previous selection is ignored', async () => {
+  const { calls, describe } = deferredDescribe();
+  const { viewer, layer } = await loadedLayer([castle, rath], { describe });
+  click(viewer, castle.id);
+  click(viewer, rath.id);
+  assert.equal(calls[0].signal.aborted, true, 'the superseded request is aborted');
+  calls[0].resolve({ ...castle, description: 'Castle text.' });
+  await flush();
+  const { detail } = layer.getRowControls();
+  assert.equal(detail.heading, 'Ringfort - rath, Ardkeen');
+  assert.equal(detail.text, 'Loading description…');
+  assert.equal(viewer.dataSource.entities.getById(castle.id).gevLabelModel.details.length, 3);
+});
+
+test('an empty click clears the detail and aborts the pending description', async () => {
+  const { calls, describe } = deferredDescribe();
+  const { viewer, layer } = await loadedLayer([castle], { describe });
+  click(viewer, castle.id);
+  click(viewer, null);
+  assert.equal(layer.getRowControls().detail, undefined);
+  assert.equal(calls[0].signal.aborted, true);
+});
+
+test('the legend blurb points to the description and record link', async () => {
+  const { layer } = await loadedLayer([castle]);
+  assert.equal(layer.getRowControls().legend[0].blurb, 'Colour shows monument type. Select a point for its description and record link.');
+});
+
+test('reselecting a monument drops the old excerpt while the description reloads', async () => {
+  const { calls, describe } = deferredDescribe();
+  const services = fakeServices();
+  const { viewer, layer } = await loadedLayer([castle], { services, describe });
+  click(viewer, castle.id);
+  calls[0].resolve({ ...castle, description: 'A tower house in pasture.' });
+  await flush();
+  const entity = viewer.dataSource.entities.getById(castle.id);
+  assert.equal(entity.gevLabelModel.details.length, 4);
+  click(viewer, castle.id);
+  assert.deepEqual(entity.gevLabelModel.details, ['CORRAUN, CO. MAYO', 'SMR MA070-110----', 'SOURCE: NATIONAL MONUMENTS SERVICE']);
+  assert.deepEqual(services.refreshed, [entity, entity, entity]);
+});
+
+test('a selected record leaving the view cancels its detail and pending description', async () => {
+  const { calls, describe } = deferredDescribe();
+  let records = [castle];
+  const viewer = fakeViewer(inView);
+  const layer = createHeritageLayer({ source: { fetch: async () => ({ records, total: records.length, saturated: false }), describe }, services: fakeServices() });
+  layer.init(viewer);
+  layer.enable(viewer);
+  await layer.update(viewer);
+  click(viewer, castle.id);
+  assert.ok(layer.getRowControls().detail);
+  records = [rath];
+  await layer.update(viewer);
+  assert.equal(layer.getRowControls().detail, undefined);
+  assert.equal(calls[0].signal.aborted, true);
+});
+
+test('disable clears the detail', async () => {
+  const { calls, describe } = deferredDescribe();
+  const { viewer, layer } = await loadedLayer([castle], { describe });
+  click(viewer, castle.id);
+  calls[0].resolve({ ...castle, description: 'A tower house.' });
+  await flush();
+  assert.ok(layer.getRowControls().detail);
+  layer.disable(viewer);
+  assert.equal(layer.getRowControls().detail, undefined);
 });

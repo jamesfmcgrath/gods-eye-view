@@ -16,6 +16,8 @@ const FEED_STATE_LABELS = Object.freeze({
 });
 
 // Presentation order is independent of catalog registration and startup order.
+// Gives each row detail heading a document-unique id for aria-labelledby.
+let detailHeadingSeq = 0;
 const PANEL_GROUPS = [
   {
     label: 'Movement',
@@ -414,13 +416,20 @@ export class LayerPanel {
     const chips = controls?.chips || [];
     const legend = controls?.legend || [];
     const infoText = controls?.info;
+    const detail = controls?.detail || null;
     this._syncRowList(listContainer, controls?.list || null);
-    container.hidden = chips.length === 0 && legend.length === 0 && !infoText;
+    const hidden =
+      chips.length === 0 && legend.length === 0 && !infoText && !detail;
+    if (container.hidden !== hidden) container.hidden = hidden;
 
     const info = container._rowControlsInfo || null;
     const firstLegend = container.querySelector('.data-toggle-legend-item');
 
-    syncChipGroup(container, chips, { before: firstLegend || info });
+    // The detail section is the final anchor so it stays last (before only its status node).
+    const detailNode = container._rowDetail || null;
+    syncChipGroup(container, chips, {
+      before: firstLegend || info || detailNode,
+    });
 
     const legendSignature = JSON.stringify(
       legend.map(({ label, color, count, blurb }) => [
@@ -447,14 +456,14 @@ export class LayerPanel {
             ? String(item.label)
             : `${item.label} ${this._formatCount(item.count)}`;
         entry.append(swatch, text);
-        container.insertBefore(entry, info);
+        container.insertBefore(entry, info || detailNode);
       }
       container._legendSignature = legendSignature;
     }
     if (infoText || info) {
       const node = info || document.createElement('div');
       if (!info) {
-        container.appendChild(node);
+        container.insertBefore(node, detailNode);
         container._rowControlsInfo = node;
       }
       const className = 'data-toggle-controls-info';
@@ -466,6 +475,92 @@ export class LayerPanel {
       const hidden = !text;
       if (node.hidden !== hidden) node.hidden = hidden;
     }
+    this._syncRowDetail(container, detail);
+  }
+
+  /**
+   * Render a row's selected-item detail (heading, meta, scrollable text, link).
+   * Real HTML so screen readers and keyboards reach it; nodes are reused so a
+   * refresh never drops focus from the scrollable text or the link. The section
+   * is not a live region (descriptions can be long); a separate visually hidden
+   * `role="status"` node, kept in the DOM while the section is hidden, carries
+   * only the short `detail.status` text.
+   * @param {HTMLElement} container The row's `.data-toggle-controls` node.
+   * @param {object|null} detail `{ label, heading, meta, text, status, link: { href, label } }`.
+   */
+  _syncRowDetail(container, detail) {
+    let node = container._rowDetail || null;
+    const status = container._rowDetailStatus || null;
+    if (!detail) {
+      if (node && !node.hidden) node.hidden = true;
+      if (status && status.textContent !== '') status.textContent = '';
+      return;
+    }
+    const part = (tag, className) => {
+      const element = document.createElement(tag);
+      element.className = className;
+      node.appendChild(element);
+      return element;
+    };
+    if (!node) {
+      node = document.createElement('section');
+      node.className = 'data-toggle-detail';
+      node._heading = part('p', 'data-toggle-detail-heading');
+      node._heading.id = `data-toggle-detail-heading-${++detailHeadingSeq}`;
+      node._meta = part('p', 'data-toggle-detail-meta');
+      node._text = part('p', 'data-toggle-detail-text');
+      node._text.tabIndex = 0;
+      node._link = part('a', 'data-toggle-detail-link');
+      node._link.target = '_blank';
+      node._link.rel = 'noopener noreferrer';
+      container.appendChild(node);
+      container._rowDetail = node;
+      const live = document.createElement('div');
+      live.className = 'data-toggle-detail-status';
+      live.setAttribute('role', 'status');
+      container.appendChild(live);
+      container._rowDetailStatus = live;
+    }
+    const setText = (element, value) => {
+      const text = value ? String(value) : '';
+      if (element.textContent !== text) element.textContent = text;
+      if (element.hidden !== !text) element.hidden = !text;
+    };
+    if (node.hidden) node.hidden = false;
+    setText(node._heading, detail.heading);
+    // Name the section by its visible heading; fall back to a generic label.
+    if (detail.heading) {
+      if (node.getAttribute('aria-labelledby') !== node._heading.id)
+        node.setAttribute('aria-labelledby', node._heading.id);
+      if (node.getAttribute('aria-label') !== null)
+        node.removeAttribute('aria-label');
+    } else {
+      const label = detail.label || 'Selected item';
+      if (node.getAttribute('aria-label') !== label)
+        node.setAttribute('aria-label', label);
+      if (node.getAttribute('aria-labelledby') !== null)
+        node.removeAttribute('aria-labelledby');
+    }
+    setText(node._meta, detail.meta);
+    setText(node._text, detail.text);
+    let href = null;
+    try {
+      const url = new URL(detail.link?.href || '');
+      if (url.protocol === 'https:') href = url.href;
+    } catch {
+      href = null;
+    }
+    setText(
+      node._link,
+      href ? `${detail.link.label || 'Open record'} (opens in a new tab)` : '',
+    );
+    if (href && node._link.getAttribute('href') !== href)
+      node._link.setAttribute('href', href);
+    if (!href && node._link.getAttribute('href') !== null)
+      node._link.removeAttribute('href');
+    const statusText = detail.status ? String(detail.status) : '';
+    const live = container._rowDetailStatus;
+    if (live.textContent !== statusText) live.textContent = statusText;
   }
 
   /**

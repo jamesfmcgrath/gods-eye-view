@@ -908,7 +908,7 @@ const schemas = [
       type: 'object',
       additionalProperties: false,
       properties: {
-        mode: { type: 'string', enum: ['count', 'nearest'] },
+        mode: { type: 'string', enum: ['count', 'nearest', 'describe'] },
         types: {
           type: 'array',
           items: { type: 'string', enum: [...HERITAGE_TYPE_KEYS] },
@@ -922,6 +922,7 @@ const schemas = [
           },
         },
         limit: { type: 'number' },
+        smrs: { type: 'string' },
       },
       required: ['mode'],
     },

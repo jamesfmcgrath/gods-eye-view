@@ -76,3 +76,8 @@ test('a missing link template gives null links', () => {
   const plain = createSmrIndex({ ...snapshot, linkTemplate: null });
   assert.equal(plain.points({ box: newport, types: [], limit: 1 }).records[0].link, null);
 });
+
+test('find returns a record by SMR number, or null', () => {
+  assert.equal(index.find('MA4').townland, 'Rockfleet');
+  assert.equal(index.find('NOPE'), null);
+});

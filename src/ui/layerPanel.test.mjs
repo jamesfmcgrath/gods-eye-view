@@ -228,3 +228,216 @@ test('the Recent Imagery readout mounts in its rail body like the weather readou
     globalThis.document = previousDocument;
   }
 });
+
+test('row detail renders accessible reused nodes and only https links', async () => {
+  const { LayerPanel } = await import('./layerPanel.js');
+  const { railFixture } = await import('./railTestFixture.mjs');
+  let writes = null;
+  const f = railFixture((key) => writes?.push(key));
+  const previousDocument = globalThis.document;
+  // The shared fixture has no removeAttribute; add it for this test only.
+  const createElement = f.document.createElement;
+  f.document.createElement = (tag) => {
+    const node = createElement(tag);
+    node.removeAttribute = (key) => node.attributes.delete(key);
+    return node;
+  };
+  globalThis.document = f.document;
+  let detail = {
+    heading: 'Castle - tower house, Corraun',
+    meta: 'Co. Mayo · SMR MA070-110----',
+    text: 'In pasture…',
+    status: 'Castle - tower house, Corraun: description loaded',
+    link: { href: 'https://example.org/r', label: 'View full record' },
+  };
+  const layers = [
+    {
+      id: 'other',
+      name: 'other',
+      icon: '*',
+      source: 'Source',
+      enabled: true,
+      showInTogglePanel: true,
+      stats: {},
+    },
+  ];
+  const panel = new LayerPanel({
+    getLayers: () => layers,
+    isEnabled: () => true,
+    setEnabled() {},
+    setLayerParams() {},
+    hasRowControls: () => true,
+    subscribeRowControls() {},
+    getRowControls: () => ({ detail }),
+  });
+  try {
+    panel.mount(f.container);
+    const row = f.find((n) => n.dataset.layerId === 'other');
+    // The fixture cannot resolve attribute selectors, so sync the row directly.
+    const sync = () =>
+      panel._syncRowControls(
+        row.querySelector('.data-toggle-controls'),
+        layers[0],
+      );
+    const controls = row.querySelector('.data-toggle-controls');
+    assert.equal(controls.hidden, false);
+    const section = row.querySelector('.data-toggle-detail');
+    // The long description is not a live region; the section is named by its heading.
+    assert.equal(section.getAttribute('aria-live'), null);
+    const heading = row.querySelector('.data-toggle-detail-heading');
+    assert.equal(heading.textContent, 'Castle - tower house, Corraun');
+    assert.match(heading.id, /^data-toggle-detail-heading-\d+$/);
+    assert.equal(section.getAttribute('aria-labelledby'), heading.id);
+    assert.equal(section.getAttribute('aria-label'), null);
+    const status = row.querySelector('.data-toggle-detail-status');
+    assert.equal(status.getAttribute('role'), 'status');
+    assert.equal(
+      status.textContent,
+      'Castle - tower house, Corraun: description loaded',
+    );
+    assert.ok(
+      !section.children.includes(status),
+      'status sits outside the section',
+    );
+    assert.equal(
+      row.querySelector('.data-toggle-detail-meta').textContent,
+      'Co. Mayo · SMR MA070-110----',
+    );
+    const text = row.querySelector('.data-toggle-detail-text');
+    assert.equal(text.textContent, 'In pasture…');
+    assert.equal(text.tabIndex, 0);
+    const link = row.querySelector('.data-toggle-detail-link');
+    assert.equal(link.getAttribute('href'), 'https://example.org/r');
+    assert.equal(link.target, '_blank');
+    assert.equal(link.rel, 'noopener noreferrer');
+    assert.equal(link.textContent, 'View full record (opens in a new tab)');
+
+    // An unchanged refresh rewrites nothing.
+    writes = [];
+    sync();
+    assert.deepEqual(
+      writes.filter((key) =>
+        ['textContent', 'attribute', 'hidden'].includes(key),
+      ),
+      [],
+    );
+    writes = null;
+
+    detail = { ...detail, text: 'Changed' };
+    sync();
+    assert.equal(row.querySelector('.data-toggle-detail'), section);
+    assert.equal(text.textContent, 'Changed');
+
+    detail = { ...detail, link: { href: 'javascript:alert(1)' } };
+    sync();
+    assert.equal(link.hidden, true);
+    assert.equal(link.getAttribute('href'), null);
+
+    // Without a heading the section falls back to its generic label.
+    detail = { ...detail, heading: '' };
+    sync();
+    assert.equal(section.getAttribute('aria-label'), 'Selected item');
+    assert.equal(section.getAttribute('aria-labelledby'), null);
+
+    detail = null;
+    sync();
+    assert.equal(section.hidden, true);
+    assert.equal(controls.hidden, true);
+    assert.equal(status.parent, controls, 'status persists while hidden');
+    assert.equal(status.getAttribute('role'), 'status');
+
+    detail = {
+      heading: 'Ringfort - rath, Doon',
+      status: 'Loading description for Ringfort - rath, Doon',
+    };
+    sync();
+    assert.equal(row.querySelector('.data-toggle-detail-status'), status);
+    assert.equal(
+      status.textContent,
+      'Loading description for Ringfort - rath, Doon',
+    );
+  } finally {
+    panel.destroy();
+    globalThis.document = previousDocument;
+  }
+});
+
+test('legend, chips and info rebuilt after the detail still render before it', async () => {
+  const { LayerPanel } = await import('./layerPanel.js');
+  const { railFixture } = await import('./railTestFixture.mjs');
+  const f = railFixture();
+  const previousDocument = globalThis.document;
+  const createElement = f.document.createElement;
+  f.document.createElement = (tag) => {
+    const node = createElement(tag);
+    node.removeAttribute = (key) => node.attributes.delete(key);
+    return node;
+  };
+  globalThis.document = f.document;
+  let controls = {
+    detail: { heading: 'Castle - tower house, Corraun', text: 'In pasture…' },
+  };
+  const layers = [
+    {
+      id: 'other',
+      name: 'other',
+      icon: '*',
+      source: 'Source',
+      enabled: true,
+      showInTogglePanel: true,
+      stats: {},
+    },
+  ];
+  const panel = new LayerPanel({
+    getLayers: () => layers,
+    isEnabled: () => true,
+    setEnabled() {},
+    setLayerParams() {},
+    hasRowControls: () => true,
+    subscribeRowControls() {},
+    getRowControls: () => controls,
+  });
+  try {
+    panel.mount(f.container);
+    const row = f.find((n) => n.dataset.layerId === 'other');
+    const container = row.querySelector('.data-toggle-controls');
+    const sync = () => panel._syncRowControls(container, layers[0]);
+    const section = row.querySelector('.data-toggle-detail');
+    assert.ok(section, 'detail rendered first');
+    assert.equal(container.children.at(-2), section);
+    assert.equal(
+      container.children.at(-1).className,
+      'data-toggle-detail-status',
+    );
+
+    controls = {
+      ...controls,
+      legend: [{ label: 'Castles', color: '#fff', count: 1 }],
+    };
+    sync();
+    controls = {
+      ...controls,
+      legend: [{ label: 'Castles', color: '#fff', count: 2 }],
+    };
+    sync();
+    assert.equal(
+      container.children.at(-2),
+      section,
+      'legend rebuilt before detail',
+    );
+    controls = {
+      ...controls,
+      chips: [{ id: 'a', label: 'A' }],
+      info: 'Some info',
+    };
+    sync();
+    const classes = container.children.map((node) => node.className);
+    assert.equal(container.children.at(-2), section, classes.join(', '));
+    assert.ok(classes.includes('data-toggle-legend-item'));
+    assert.ok(classes.includes('data-toggle-controls-info'));
+    assert.ok(classes.some((name) => name.startsWith('data-toggle-chip')));
+  } finally {
+    panel.destroy();
+    globalThis.document = previousDocument;
+  }
+});
