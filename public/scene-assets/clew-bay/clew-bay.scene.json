@@ -1,0 +1,306 @@
+{
+  "version": 6,
+  "scenes": [
+    {
+      "id": "clew-bay-granuaile",
+      "title": "Granuaile's Clew Bay",
+      "dataPacks": [
+        {
+          "id": "heritage-sites",
+          "version": 1,
+          "format": "geojson",
+          "source": {
+            "adapter": "assets",
+            "path": "clew-bay/sites.geojson"
+          },
+          "attribution": {
+            "text": "Coordinates: OpenStreetMap contributors via Nominatim. Heights: Open-Meteo elevation API.",
+            "license": "ODbL-1.0",
+            "url": "https://www.openstreetmap.org/copyright"
+          },
+          "placement": {
+            "altitudeReference": "ellipsoid"
+          }
+        },
+        {
+          "id": "greenway",
+          "version": 1,
+          "format": "geojson",
+          "source": {
+            "adapter": "assets",
+            "path": "clew-bay/greenway.geojson"
+          },
+          "attribution": {
+            "text": "Approximate route sketched from village waypoints (OpenStreetMap contributors). Not the official track.",
+            "license": "ODbL-1.0",
+            "url": "https://www.openstreetmap.org/copyright"
+          },
+          "placement": {
+            "altitudeReference": "ellipsoid"
+          }
+        },
+        {
+          "id": "smr-monuments",
+          "version": 1,
+          "format": "geojson",
+          "source": {
+            "adapter": "assets",
+            "path": "clew-bay/smr-monuments.geojson"
+          },
+          "attribution": {
+            "text": "Sites and Monuments Record: National Monuments Service, Government of Ireland. Heights: Open-Meteo elevation API.",
+            "license": "CC-BY-4.0",
+            "url": "https://www.archaeology.ie/collections-and-publications/open-data/"
+          },
+          "placement": {
+            "altitudeReference": "ellipsoid"
+          }
+        }
+      ],
+      "shots": [
+        {
+          "id": "overview",
+          "title": "Clew Bay from the Atlantic",
+          "durationSec": 4,
+          "holdSec": 5,
+          "camera": {
+            "lat": 53.78362,
+            "lon": -10.0766,
+            "alt": 14057,
+            "heading": 75,
+            "pitch": -30,
+            "roll": 0
+          },
+          "visual": {
+            "style": "normal"
+          },
+          "dataPackIds": [
+            "heritage-sites",
+            "greenway",
+            "smr-monuments"
+          ]
+        },
+        {
+          "id": "croagh-patrick",
+          "title": "Croagh Patrick, the Reek",
+          "durationSec": 6,
+          "holdSec": 4,
+          "camera": {
+            "lat": 53.78191,
+            "lon": -9.65273,
+            "alt": 1721,
+            "heading": 190,
+            "pitch": -20,
+            "roll": 0
+          },
+          "visual": {
+            "style": "normal"
+          },
+          "dataPackIds": [
+            "heritage-sites",
+            "greenway",
+            "smr-monuments"
+          ]
+        },
+        {
+          "id": "murrisk",
+          "title": "Murrisk Abbey, pilgrim start of the Reek",
+          "durationSec": 6,
+          "holdSec": 4,
+          "camera": {
+            "lat": 53.78596,
+            "lon": -9.63567,
+            "alt": 410,
+            "heading": 210,
+            "pitch": -35,
+            "roll": 0
+          },
+          "visual": {
+            "style": "normal"
+          },
+          "dataPackIds": [
+            "heritage-sites",
+            "greenway",
+            "smr-monuments"
+          ]
+        },
+        {
+          "id": "westport-house",
+          "title": "Westport House, seat of Granuaile's descendants",
+          "durationSec": 6,
+          "holdSec": 4,
+          "camera": {
+            "lat": 53.79587,
+            "lon": -9.53849,
+            "alt": 461,
+            "heading": 20,
+            "pitch": -35,
+            "roll": 0
+          },
+          "visual": {
+            "style": "normal"
+          },
+          "dataPackIds": [
+            "heritage-sites",
+            "greenway",
+            "smr-monuments"
+          ]
+        },
+        {
+          "id": "burrishoole",
+          "title": "Burrishoole Friary",
+          "durationSec": 6,
+          "holdSec": 4,
+          "camera": {
+            "lat": 53.8946,
+            "lon": -9.56965,
+            "alt": 407,
+            "heading": 340,
+            "pitch": -35,
+            "roll": 0
+          },
+          "visual": {
+            "style": "normal"
+          },
+          "dataPackIds": [
+            "heritage-sites",
+            "greenway",
+            "smr-monuments"
+          ]
+        },
+        {
+          "id": "rockfleet",
+          "title": "Rockfleet Castle, Granuaile's stronghold",
+          "durationSec": 6,
+          "holdSec": 4,
+          "camera": {
+            "lat": 53.89195,
+            "lon": -9.631,
+            "alt": 363,
+            "heading": 30,
+            "pitch": -30,
+            "roll": 0
+          },
+          "visual": {
+            "style": "normal"
+          },
+          "dataPackIds": [
+            "heritage-sites",
+            "greenway",
+            "smr-monuments"
+          ]
+        },
+        {
+          "id": "greenway",
+          "title": "The Great Western Greenway, Westport to Achill",
+          "durationSec": 7,
+          "holdSec": 5,
+          "camera": {
+            "lat": 53.64258,
+            "lon": -9.65199,
+            "alt": 18057,
+            "heading": 350,
+            "pitch": -35,
+            "roll": 0
+          },
+          "visual": {
+            "style": "normal"
+          },
+          "dataPackIds": [
+            "heritage-sites",
+            "greenway",
+            "smr-monuments"
+          ]
+        },
+        {
+          "id": "kildavnet",
+          "title": "Kildavnet Castle, Achill",
+          "durationSec": 6,
+          "holdSec": 4,
+          "camera": {
+            "lat": 53.88004,
+            "lon": -9.93809,
+            "alt": 365,
+            "heading": 280,
+            "pitch": -30,
+            "roll": 0
+          },
+          "visual": {
+            "style": "normal"
+          },
+          "dataPackIds": [
+            "heritage-sites",
+            "greenway",
+            "smr-monuments"
+          ]
+        },
+        {
+          "id": "clare-island",
+          "title": "Granuaile's Castle, Clare Island",
+          "durationSec": 6,
+          "holdSec": 4,
+          "camera": {
+            "lat": 53.79968,
+            "lon": -9.9405,
+            "alt": 457,
+            "heading": 270,
+            "pitch": -30,
+            "roll": 0
+          },
+          "visual": {
+            "style": "normal"
+          },
+          "dataPackIds": [
+            "heritage-sites",
+            "greenway",
+            "smr-monuments"
+          ]
+        },
+        {
+          "id": "clare-abbey",
+          "title": "Clare Island Abbey, her reputed resting place",
+          "durationSec": 6,
+          "holdSec": 4,
+          "camera": {
+            "lat": 53.79478,
+            "lon": -9.98185,
+            "alt": 435,
+            "heading": 250,
+            "pitch": -35,
+            "roll": 0
+          },
+          "visual": {
+            "style": "normal"
+          },
+          "dataPackIds": [
+            "heritage-sites",
+            "greenway",
+            "smr-monuments"
+          ]
+        },
+        {
+          "id": "finale",
+          "title": "Clew Bay and its islands",
+          "durationSec": 8,
+          "holdSec": 6,
+          "camera": {
+            "lat": 53.8768,
+            "lon": -10.16969,
+            "alt": 30057,
+            "heading": 100,
+            "pitch": -45,
+            "roll": 0
+          },
+          "visual": {
+            "style": "normal"
+          },
+          "dataPackIds": [
+            "heritage-sites",
+            "greenway",
+            "smr-monuments"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "Croagh Patrick summit",
+      "properties": {},
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -9.65925,
+          53.76003,
+          851.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "Murrisk Abbey",
+      "properties": {},
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -9.63947,
+          53.78207,
+          90.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "Westport House",
+      "properties": {},
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -9.53552,
+          53.80069,
+          91.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "Burrishoole Friary",
+      "properties": {},
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -9.57226,
+          53.89882,
+          87.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "Rockfleet Castle",
+      "properties": {},
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -9.62704,
+          53.89599,
+          93.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "Granuaile's Castle, Clare Island",
+      "properties": {},
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -9.95104,
+          53.79968,
+          87.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "Clare Island Abbey",
+      "properties": {},
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -9.98899,
+          53.79324,
+          115.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "Kildavnet Castle, Achill",
+      "properties": {},
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -9.94589,
+          53.88085,
+          95.0
+        ]
+      }
+    }
+  ]
+}
