@@ -39,7 +39,10 @@ function readBox(params, maxSpan) {
   return { south, west, north, east };
 }
 
-/** Local-snapshot SMR queries for dev and preview; never contacts the SMR service. */
+/**
+ * SMR queries for dev and preview: points, stats and nearest use the local
+ * snapshot; /record fetches one description on demand, cached and budgeted.
+ */
 export function heritageProxy({
   loadSnapshot = () => loadSmrSnapshotFile(SMR_SNAPSHOT_PATH),
   recordFetcher = createSmrRecordFetcher({

@@ -88,3 +88,75 @@ test('stale disk entries are refetched after 30 days', async () => {
   await fetcher().get('MA070-110----');
   assert.equal(calls, 2);
 });
+
+test('the budget is a sliding 60 s window over the last calls', async () => {
+  let t = 0;
+  const ids = ['MA002-001----', 'MA002-002----', 'MA002-003----', 'MA002-004----'];
+  const fetcher = createSmrRecordFetcher({ fetchImpl: async () => reply('X'), fs: memoryFs(), cacheDir: '/c', budgetPerMinute: 2, now: () => t });
+  await fetcher.get(ids[0]);
+  t = 30_000;
+  await fetcher.get(ids[1]);
+  t = 59_000;
+  await assert.rejects(fetcher.get(ids[2]), { code: 'SMR_UPSTREAM_BUSY' });
+  t = 60_500;
+  assert.equal((await fetcher.get(ids[2])).cached, false);
+  // A fixed window would have reset at 60.5 s; the 30 s call still counts.
+  t = 61_000;
+  await assert.rejects(fetcher.get(ids[3]), { code: 'SMR_UPSTREAM_BUSY' });
+  t = 90_500;
+  assert.equal((await fetcher.get(ids[3])).cached, false);
+});
+
+test('an upstream HTTP 429 cools down for 60 s without calling upstream', async () => {
+  let t = 0;
+  let calls = 0;
+  let status = 429;
+  const fetcher = createSmrRecordFetcher({
+    fetchImpl: async () => { calls++; return status === 200 ? reply('X') : new Response('slow down', { status }); },
+    fs: memoryFs(), cacheDir: '/c', now: () => t,
+  });
+  await assert.rejects(fetcher.get('MA003-001----'), { code: 'SMR_UPSTREAM_BUSY' });
+  assert.equal(calls, 1);
+  t = 30_000;
+  await assert.rejects(fetcher.get('MA003-002----'), { code: 'SMR_UPSTREAM_BUSY' });
+  assert.equal(calls, 1);
+  t = 60_000;
+  status = 200;
+  assert.equal((await fetcher.get('MA003-002----')).cached, false);
+  assert.equal(calls, 2);
+});
+
+test('an upstream 500 rejects with a plain error, not busy', async () => {
+  const fetcher = createSmrRecordFetcher({ fetchImpl: async () => new Response('oops', { status: 500 }), fs: memoryFs(), cacheDir: '/c', now: () => 0 });
+  await assert.rejects(fetcher.get('MA004-001----'), (error) => {
+    assert.ok(error instanceof Error);
+    assert.notEqual(error.code, 'SMR_UPSTREAM_BUSY');
+    return true;
+  });
+});
+
+test('a request that arrives while the disk read is pending joins the in-flight fetch', async () => {
+  let calls = 0;
+  const fs = memoryFs();
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let reads = 0;
+  // The first read starts before any cache file exists but resolves late.
+  const slowFs = {
+    ...fs,
+    readFile: async (file) => {
+      if (reads++ > 0) return fs.readFile(file);
+      const result = fs.readFile(file).then((text) => ({ text }), (error) => ({ error }));
+      await gate;
+      const { text, error } = await result;
+      if (error) throw error;
+      return text;
+    },
+  };
+  const fetcher = createSmrRecordFetcher({ fetchImpl: async () => { calls++; return reply('X'); }, fs: slowFs, cacheDir: '/c', now: () => 0 });
+  const first = fetcher.get('MA070-110----');
+  await fetcher.get('MA070-110----');
+  release();
+  assert.equal((await first).description, 'X');
+  assert.equal(calls, 1);
+});

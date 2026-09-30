@@ -55,8 +55,8 @@ export function createSmrRecordFetcher({
 }) {
   const memory = new Map();
   const inFlight = new Map();
-  let windowStart = -Infinity;
-  let used = 0;
+  // Start times of the most recent upstream calls, oldest first.
+  const recent = [];
   let coolUntil = -Infinity;
 
   const fresh = (value) => now() - Date.parse(value.fetchedAt) < CACHE_TTL_MS;
@@ -92,12 +92,10 @@ export function createSmrRecordFetcher({
   function spend() {
     const t = now();
     if (t < coolUntil) throw busy();
-    if (t - windowStart >= 60_000) {
-      windowStart = t;
-      used = 0;
-    }
-    if (used >= budgetPerMinute) throw busy();
-    used++;
+    if (recent.length >= budgetPerMinute && t - recent[0] < 60_000)
+      throw busy();
+    recent.push(t);
+    if (recent.length > budgetPerMinute) recent.shift();
   }
 
   async function fetchUpstream(smrs) {
@@ -142,6 +140,9 @@ export function createSmrRecordFetcher({
         remember(disk);
         return { ...disk, cached: true };
       }
+      // Another request may have fetched or started fetching during the disk read.
+      const settled = memory.get(smrs);
+      if (settled && fresh(settled)) return { ...settled, cached: true };
       if (!inFlight.has(smrs))
         inFlight.set(
           smrs,
